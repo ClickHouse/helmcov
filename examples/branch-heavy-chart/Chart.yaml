@@ -1,0 +1,6 @@
+apiVersion: v2
+name: branch-heavy-chart
+description: Branch-heavy chart for helmcov branch coverage
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

@@ -1,0 +1,9 @@
+suite: chart-a
+templates:
+  - templates/configmap.yaml
+tests:
+  - it: renders chart-a default
+    asserts:
+      - equal:
+          path: data.enabled
+          value: "yes"

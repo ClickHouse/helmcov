@@ -1,0 +1,16 @@
+suite: configmap
+templates:
+  - templates/configmap.yaml
+tests:
+  - it: renders enabled feature by default
+    asserts:
+      - equal:
+          path: data.feature
+          value: enabled
+  - it: renders disabled feature from values file
+    values:
+      - tests/values/disabled.yaml
+    asserts:
+      - equal:
+          path: data.feature
+          value: disabled

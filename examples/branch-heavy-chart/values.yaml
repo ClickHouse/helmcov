@@ -1,0 +1,6 @@
+service:
+  enabled: true
+ports:
+  - 80
+labels:
+  app: branch-heavy

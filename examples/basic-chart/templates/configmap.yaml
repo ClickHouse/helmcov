@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: basic-example
+data:
+  feature: {{ if .Values.feature.enabled }}"enabled"{{ else }}"disabled"{{ end }}
+  message: {{ .Values.message | quote }}

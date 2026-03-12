@@ -1,0 +1,28 @@
+{{ if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: branch-heavy
+spec:
+  selector:
+{{ with .Values.labels }}
+{{ range $k, $v := . }}
+    {{ $k }}: {{ $v | quote }}
+{{ else }}
+    app: none
+{{ end }}
+{{ else }}
+    app: none
+{{ end }}
+  ports:
+{{ range .Values.ports }}
+    - port: {{ . }}
+{{ else }}
+    - port: 0
+{{ end }}
+{{ else }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: branch-heavy-disabled
+{{ end }}

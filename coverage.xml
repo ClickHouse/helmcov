@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage line-rate="0.1667" branch-rate="0.5000" version="helmcov">
+  <sources>
+    <source>.</source>
+  </sources>
+  <packages>
+    <package name="templates">
+      <classes>
+        <class name="examples/low-coverage-chart/templates/mode-config.yaml" filename="examples/low-coverage-chart/templates/mode-config.yaml">
+          <lines>
+            <line number="1" hits="0"></line>
+            <line number="2" hits="0"></line>
+            <line number="3" hits="0"></line>
+            <line number="4" hits="0"></line>
+            <line number="5" hits="0"></line>
+            <line number="6" hits="4"></line>
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>

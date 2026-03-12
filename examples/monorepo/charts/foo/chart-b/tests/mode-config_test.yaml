@@ -1,0 +1,9 @@
+suite: chart-b
+templates:
+  - templates/mode-config.yaml
+tests:
+  - it: renders chart-b default
+    asserts:
+      - equal:
+          path: data.mode
+          value: dev

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage line-rate="0.0000" branch-rate="0.0000" version="helmcov">
+  <sources>
+    <source>.</source>
+  </sources>
+  <packages></packages>
+</coverage>

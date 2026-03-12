@@ -1,0 +1,34 @@
+name: vendor-artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without v prefix (example: 0.1.0)"
+        required: true
+        type: string
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          gh release download "v${{ inputs.version }}" --dir dist
+      - name: Record image references
+        run: |
+          {
+            echo "ghcr.io/${{ github.repository_owner }}/helmcov:v${{ inputs.version }}"
+            echo "ghcr.io/${{ github.repository_owner }}/helmcov:latest"
+          } > dist/image-refs.txt
+      - name: Upload vendored artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: helmcov-v${{ inputs.version }}
+          path: dist

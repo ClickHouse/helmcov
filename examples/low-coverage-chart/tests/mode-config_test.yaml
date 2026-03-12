@@ -1,0 +1,9 @@
+suite: mode-config
+templates:
+  - templates/mode-config.yaml
+tests:
+  - it: renders dev mode by default
+    asserts:
+      - equal:
+          path: data.mode
+          value: dev

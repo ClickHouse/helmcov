@@ -1,0 +1,21 @@
+suite: service
+templates:
+  - templates/service.yaml
+tests:
+  - it: renders service by default
+    asserts:
+      - isKind:
+          of: Service
+  - it: renders disabled configmap variant
+    values:
+      - tests/values/disabled.yaml
+    asserts:
+      - isKind:
+          of: ConfigMap
+  - it: covers empty ports branch
+    values:
+      - tests/values/empty-ports.yaml
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 0
