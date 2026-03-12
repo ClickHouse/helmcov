@@ -1,11 +1,14 @@
 name: vendor-artifacts
 
 on:
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       version:
         description: "Release version without v prefix (example: 0.1.0)"
-        required: true
+        required: false
         type: string
 
 jobs:
@@ -15,20 +18,31 @@ jobs:
       contents: read
       packages: read
     steps:
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ inputs.version }}" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version input is required for workflow_dispatch" >&2
+            exit 1
+          fi
       - name: Download release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p dist
-          gh release download "v${{ inputs.version }}" --dir dist
+          gh release download "v${{ steps.version.outputs.value }}" --dir dist
       - name: Record image references
         run: |
           {
-            echo "ghcr.io/${{ github.repository_owner }}/helmcov:v${{ inputs.version }}"
+            echo "ghcr.io/${{ github.repository_owner }}/helmcov:v${{ steps.version.outputs.value }}"
             echo "ghcr.io/${{ github.repository_owner }}/helmcov:latest"
           } > dist/image-refs.txt
       - name: Upload vendored artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: helmcov-v${{ inputs.version }}
+          name: helmcov-v${{ steps.version.outputs.value }}
           path: dist
