@@ -38,7 +38,7 @@ func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[st
 	}
 
 	registerTemplateLines(templateName, tpl, trace.Lines)
-	walkTree(parsed.Tree.Root, templateName, parsed, values, tpl, &trace)
+	walkTree(parsed.Root, templateName, parsed, values, tpl, &trace)
 	if !hasCoveredLines(trace.Lines) {
 		// Fallback for templates where parse nodes do not expose stable positions.
 		for lineKey := range trace.Lines {

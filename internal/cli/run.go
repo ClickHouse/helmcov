@@ -159,7 +159,7 @@ func writeRequestedFormats(cfg Config, report coverage.Report) error {
 	return nil
 }
 
-func writeToFile(path string, writeFn func(io.Writer) error) error {
+func writeToFile(path string, writeFn func(io.Writer) error) (err error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -167,9 +167,15 @@ func writeToFile(path string, writeFn func(io.Writer) error) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		closeErr := file.Close()
+		if err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 
-	return writeFn(file)
+	err = writeFn(file)
+	return err
 }
 
 func writeVerboseCoverage(stdout io.Writer, report coverage.Report) error {

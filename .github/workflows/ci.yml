@@ -10,10 +10,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Test
-        run: go test ./...
-      - name: Build
-        run: go build ./cmd/helmcov
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - name: Run Make CI target
+        run: |
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          make ci
+      - name: Detect code changes for commit convention checks
+        id: changed
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            code:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Dockerfile*'
+              - '.github/workflows/*.yml'
+      - name: Validate PR title uses Conventional Commits
+        if: github.event_name == 'pull_request' && steps.changed.outputs.code == 'true'
+        run: |
+          title='${{ github.event.pull_request.title }}'
+          pattern='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9._/-]+\))?(!)?: .+'
+          if [[ "$title" =~ $pattern ]]; then
+            echo "Conventional PR title: $title"
+            exit 0
+          fi
+          echo "PR title must follow Conventional Commits when code changes." >&2
+          echo "Got: $title" >&2
+          echo "Example: feat(ci): use make ci in workflow" >&2
+          exit 1

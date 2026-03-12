@@ -56,6 +56,10 @@ Examples:
 - `feat(report): add verbose uncovered line refs`
 - `feat!: change default report format`
 
+CI validates Conventional Commit PR titles on pull requests when code files are
+changed. This aligns with squash-merge workflows where the PR title becomes the
+merge commit on `main`.
+
 ## Tagging Convention
 
 This repository uses a single semver convention everywhere:

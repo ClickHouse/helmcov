@@ -34,6 +34,19 @@ go build -o helmcov ./cmd/helmcov
 docker build -t helmcov:dev .
 ```
 
+## Development workflow
+
+Use the repo `Makefile` to run local checks and setup:
+
+```bash
+make setup
+make ci
+```
+
+`make setup` installs a native git `commit-msg` hook and runs `go mod tidy`.
+`make ci` runs formatting checks, linting, tests (including integration tests),
+and build.
+
 ## Usage
 
 ```bash
@@ -96,6 +109,29 @@ go run ./cmd/helmcov \
 ```
 
 ## GitHub Actions integration
+
+CI (`.github/workflows/ci.yml`) enforces:
+
+- `gofmt` formatting checks
+- `go vet` and `golangci-lint` linting
+- full Go test suite + explicit integration tests
+- build validation
+- Conventional Commit PR titles when code files changed (squash-merge friendly)
+
+The workflow executes `make ci` so CI and local checks stay aligned.
+
+## Local commit-msg gate
+
+Conventional commit validation runs locally via a native git `commit-msg` hook.
+
+Setup:
+
+```bash
+make hooks
+```
+
+The hook source lives in `.githooks/commit-msg` and validates commit subjects
+with `scripts/validate-conventional-commit.sh`.
 
 ### Binary mode
 

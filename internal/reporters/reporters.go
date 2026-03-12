@@ -102,7 +102,7 @@ type coberturaSource struct {
 }
 
 type coberturaPackage struct {
-	Name    string          `xml:"name,attr"`
+	Name    string           `xml:"name,attr"`
 	Classes coberturaClasses `xml:"classes"`
 }
 
