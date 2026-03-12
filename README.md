@@ -147,10 +147,11 @@ jobs:
 - `.github/workflows/release-please.yml`: maintains semver releases and
   `CHANGELOG.md` using Release Please.
 - `.github/workflows/release.yml`: publishes multi-OS binaries and Docker image
-  through GoReleaser on tag push.
+  through GoReleaser on tag push, then uploads vendored artifacts as a second
+  job in the same workflow.
 - `.github/workflows/vendor-artifacts.yml`: downloads a tagged release and
-  uploads binaries plus image references as reusable artifacts. Runs on release
-  publish automatically and can also be triggered manually.
+  uploads binaries plus image references as reusable artifacts. Manual fallback
+  workflow for backfills and retries.
 - Detailed runbook: `docs/release-flow.md`.
 
 ## Semver workflow
@@ -159,10 +160,18 @@ jobs:
 2. Release Please opens/updates a release PR with version bump + changelog.
 3. Merge that PR to create `vX.Y.Z` tag and GitHub release.
 4. `release.yml` publishes binaries and GHCR image tags for that version.
-5. `vendor-artifacts.yml` runs on release publish and uploads vendored assets.
+5. `release.yml` vendor job downloads release assets and uploads vendored
+   artifacts.
+6. Optional: run `vendor-artifacts.yml` manually for backfill/retry.
 
 Release Please infers bump level from Conventional Commit prefixes (`feat`,
 `fix`, and `!`/`BREAKING CHANGE`).
+
+Tag and image convention is `vX.Y.Z`:
+
+- Git tag: `vX.Y.Z`
+- GitHub release: `vX.Y.Z`
+- GHCR image: `ghcr.io/<owner>/helmcov:vX.Y.Z` (+ `latest`)
 
 ## SonarQube integration notes
 

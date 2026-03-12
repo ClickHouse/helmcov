@@ -15,10 +15,11 @@ publishing to GHCR, and vendored release artifacts.
    - runs GoReleaser
    - publishes binaries/archives/checksums
    - publishes Docker image to GHCR
-5. `vendor-artifacts.yml` triggers on `release.published`:
+5. `release.yml` then runs a vendoring job:
    - downloads release assets
    - writes GHCR image refs
    - uploads everything as reusable workflow artifact
+6. `vendor-artifacts.yml` remains available as a manual fallback workflow.
 
 ## Files Involved
 
@@ -44,6 +45,19 @@ Examples:
 - `feat(report): add verbose uncovered line refs`
 - `feat!: change default report format`
 
+## Tagging Convention
+
+This repository uses a single semver convention everywhere:
+
+- Git tag: `vX.Y.Z` (for example `v0.2.0`)
+- GitHub release: `vX.Y.Z`
+- GHCR image tag: `vX.Y.Z`
+
+Release Please is configured with:
+
+- `include-v-in-tag: true`
+- `include-component-in-tag: false`
+
 ## First Release Bootstrap
 
 If no releases exist yet:
@@ -61,11 +75,9 @@ git push origin v0.1.0
 
 ## Manual Vendoring
 
-`vendor-artifacts.yml` also supports manual dispatch:
+`vendor-artifacts.yml` supports manual dispatch for backfill/retry:
 
 - Input `version` expects bare semver (for example `0.1.0`, without `v`).
-
-The workflow resolves it to `v<version>` when downloading release assets.
 
 ## Published Artifacts
 
