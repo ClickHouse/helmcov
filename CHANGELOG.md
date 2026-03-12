@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/jordan-simonovski/helmcov/compare/v0.1.3...v0.2.0) (2026-03-12)
+
+
+### Features
+
+* **ci:** hardened CI workflows to ensure formatting, etc runs ([#4](https://github.com/jordan-simonovski/helmcov/issues/4)) ([691baf6](https://github.com/jordan-simonovski/helmcov/commit/691baf6bda253ea27b2dc5c788f3f8b0c09af9c0))
+
 ## [0.1.3](https://github.com/jordan-simonovski/helmcov/compare/v0.1.2...v0.1.3) (2026-03-12)
 
 
