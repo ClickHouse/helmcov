@@ -1,0 +1,8 @@
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+WORKDIR /work
+
+# GoReleaser docker builds use a temp context containing this Dockerfile
+# and the prebuilt binary artifact.
+COPY helmcov /usr/local/bin/helmcov
+ENTRYPOINT ["/usr/local/bin/helmcov"]

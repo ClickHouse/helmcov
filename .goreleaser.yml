@@ -33,7 +33,7 @@ checksum:
 
 dockers:
   - ids: [helmcov]
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.release
     image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/helmcov:{{ .Version }}"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/helmcov:latest"

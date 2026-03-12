@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -43,11 +44,23 @@ func TestRunAgainstExamples(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			var out bytes.Buffer
-			if err := Run([]string{"--chart", tc.chart, "--tests", tc.tests}, &out); err != nil {
+			base := t.TempDir()
+			if err := Run([]string{
+				"--chart", tc.chart,
+				"--tests", tc.tests,
+				"--go-coverprofile", filepath.Join(base, "coverage.out"),
+				"--cobertura-file", filepath.Join(base, "coverage.xml"),
+			}, &out); err != nil {
 				t.Fatalf("run failed: %v", err)
 			}
 			if out.Len() == 0 {
 				t.Fatalf("expected output")
+			}
+			if _, err := os.Stat(filepath.Join(base, "coverage.out")); err != nil {
+				t.Fatalf("expected go coverage output: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(base, "coverage.xml")); err != nil {
+				t.Fatalf("expected cobertura output: %v", err)
 			}
 		})
 	}
@@ -62,12 +75,23 @@ func TestRunAgainstMonorepoExamples(t *testing.T) {
 	}
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
 	chartsRoot := filepath.Join(repoRoot, "examples", "monorepo", "charts")
+	base := t.TempDir()
 
 	var out bytes.Buffer
-	if err := Run([]string{"--charts", chartsRoot}, &out); err != nil {
+	if err := Run([]string{
+		"--charts", chartsRoot,
+		"--go-coverprofile", filepath.Join(base, "coverage.out"),
+		"--cobertura-file", filepath.Join(base, "coverage.xml"),
+	}, &out); err != nil {
 		t.Fatalf("run failed: %v", err)
 	}
 	if out.Len() == 0 {
 		t.Fatalf("expected output")
+	}
+	if _, err := os.Stat(filepath.Join(base, "coverage.out")); err != nil {
+		t.Fatalf("expected go coverage output: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(base, "coverage.xml")); err != nil {
+		t.Fatalf("expected cobertura output: %v", err)
 	}
 }

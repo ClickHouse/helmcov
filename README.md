@@ -151,6 +151,7 @@ jobs:
 - `.github/workflows/vendor-artifacts.yml`: downloads a tagged release and
   uploads binaries plus image references as reusable artifacts. Runs on release
   publish automatically and can also be triggered manually.
+- Detailed runbook: `docs/release-flow.md`.
 
 ## Semver workflow
 
