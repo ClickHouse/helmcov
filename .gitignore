@@ -1,0 +1,20 @@
+# Binaries
+helmcov
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test/build outputs
+*.test
+*.out
+coverage.out
+coverage.xml
+
+# Release/build artifacts
+dist/
+build/
+
+# IDE/OS noise
+.DS_Store
