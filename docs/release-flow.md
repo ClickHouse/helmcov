@@ -16,10 +16,15 @@ publishing to GHCR, and vendored release artifacts.
    - publishes binaries/archives/checksums
    - publishes Docker image to GHCR
 5. `release.yml` then runs a vendoring job:
-   - downloads release assets
+   - downloads GoReleaser `dist/` artifact from the previous job
    - writes GHCR image refs
    - uploads everything as reusable workflow artifact
 6. `vendor-artifacts.yml` remains available as a manual fallback workflow.
+
+> Important: to allow downstream tag-triggered workflows (`release.yml`) after
+> Release Please creates a tag/release, configure repository secret
+> `RELEASE_PLEASE_TOKEN` (PAT). Using only `GITHUB_TOKEN` may suppress those
+> downstream workflow triggers.
 
 ## Files Involved
 
@@ -30,6 +35,12 @@ publishing to GHCR, and vendored release artifacts.
 - `release-please-config.json`
 - `.release-please-manifest.json`
 - `CHANGELOG.md`
+
+## Required Repository Secrets
+
+- `RELEASE_PLEASE_TOKEN` (recommended): personal access token used by
+  `release-please.yml` so generated tag/release events can trigger downstream
+  workflows reliably.
 
 ## Commit Convention and Version Bumps
 

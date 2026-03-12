@@ -148,7 +148,7 @@ jobs:
   `CHANGELOG.md` using Release Please.
 - `.github/workflows/release.yml`: publishes multi-OS binaries and Docker image
   through GoReleaser on tag push, then uploads vendored artifacts as a second
-  job in the same workflow.
+  job in the same workflow using the GoReleaser `dist/` artifact handoff.
 - `.github/workflows/vendor-artifacts.yml`: downloads a tagged release and
   uploads binaries plus image references as reusable artifacts. Manual fallback
   workflow for backfills and retries.
@@ -172,6 +172,10 @@ Tag and image convention is `vX.Y.Z`:
 - Git tag: `vX.Y.Z`
 - GitHub release: `vX.Y.Z`
 - GHCR image: `ghcr.io/<owner>/helmcov:vX.Y.Z` (+ `latest`)
+
+For reliable downstream workflow triggering after Release Please creates tags,
+configure repo secret `RELEASE_PLEASE_TOKEN` (PAT). `GITHUB_TOKEN` can suppress
+tag/release-triggered follow-on workflows.
 
 ## SonarQube integration notes
 

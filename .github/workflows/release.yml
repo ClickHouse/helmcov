@@ -33,6 +33,12 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload GoReleaser dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goreleaser-dist-${{ github.ref_name }}
+          path: dist
+          if-no-files-found: error
 
   vendor-artifacts:
     runs-on: ubuntu-latest
@@ -44,21 +50,17 @@ jobs:
       - name: Resolve version from tag
         id: version
         run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-      - name: Download release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+      - name: Download GoReleaser dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: goreleaser-dist-${{ github.ref_name }}
+          path: dist
+      - name: Validate dist contents
         run: |
-          mkdir -p dist
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            if gh release download "v${{ steps.version.outputs.value }}" --dir dist; then
-              exit 0
-            fi
-            echo "release assets not ready yet (attempt $attempt), retrying..." >&2
-            sleep 6
-          done
-          echo "failed to download release assets for v${{ steps.version.outputs.value }}" >&2
-          exit 1
+          if [ -z "$(ls -A dist)" ]; then
+            echo "dist artifact is empty" >&2
+            exit 1
+          fi
       - name: Record image references
         run: |
           {
