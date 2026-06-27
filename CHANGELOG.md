@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jordan-simonovski/helmcov/compare/v0.2.0...v0.3.0) (2026-06-27)
+
+
+### Features
+
+* **helm:** add Helm rendering support and tpl branch tracing ([#6](https://github.com/jordan-simonovski/helmcov/issues/6)) ([8c18c6c](https://github.com/jordan-simonovski/helmcov/commit/8c18c6cce5b341232fdd611ee5eaf700bbf01d89))
+
 ## [0.2.0](https://github.com/jordan-simonovski/helmcov/compare/v0.1.3...v0.2.0) (2026-03-12)
 
 
