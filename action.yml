@@ -22,9 +22,9 @@ inputs:
     required: false
     default: "0"
   version:
-    description: helmcov release tag to install (for example v0.3.3), or dev to build from source.
+    description: helmcov release tag to install (for example v0.4.0), or dev to build from source.
     required: false
-    default: v0.3.3
+    default: v0.4.0
   repository:
     description: GitHub repository that hosts helmcov release assets.
     required: false
@@ -70,10 +70,9 @@ runs:
   using: composite
   steps:
     - name: Set up Go
-      if: inputs.version == 'dev'
       uses: actions/setup-go@v5
       with:
-        go-version-file: go.mod
+        go-version-file: ${{ github.action_path }}/go.mod
 
     - name: Install helmcov
       shell: bash

@@ -7,8 +7,23 @@ INSTALL_DIR="${3:?install dir required}"
 
 mkdir -p "$INSTALL_DIR"
 
+build_from_dir() {
+  local src_dir="$1"
+  if [ ! -f "${src_dir}/cmd/helmcov/main.go" ]; then
+    echo "helmcov source not found at ${src_dir}/cmd/helmcov" >&2
+    return 1
+  fi
+  (cd "${src_dir}" && go build -o "${INSTALL_DIR}/helmcov" ./cmd/helmcov)
+  chmod +x "${INSTALL_DIR}/helmcov"
+}
+
+binary_supports_markdown() {
+  [ -x "${INSTALL_DIR}/helmcov" ] && \
+    "${INSTALL_DIR}/helmcov" --help 2>&1 | grep -q 'markdown-file'
+}
+
 if [ "$VERSION" = "dev" ]; then
-  go build -o "${INSTALL_DIR}/helmcov" ./cmd/helmcov
+  build_from_dir "${GITHUB_WORKSPACE}"
   exit 0
 fi
 
@@ -47,3 +62,17 @@ else
 fi
 
 chmod +x "${INSTALL_DIR}/helmcov"
+
+if binary_supports_markdown; then
+  exit 0
+fi
+
+ACTION_ROOT="${GITHUB_ACTION_PATH:-}"
+if [ -n "$ACTION_ROOT" ] && [ -f "${ACTION_ROOT}/internal/reporters/markdown.go" ]; then
+  echo "helmcov ${VERSION} lacks markdown support; building from action source" >&2
+  build_from_dir "$ACTION_ROOT"
+  exit 0
+fi
+
+echo "helmcov ${VERSION} does not support markdown output and no action source fallback is available" >&2
+exit 1
