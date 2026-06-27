@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/jordan-simonovski/helmcov/compare/v0.4.1...v0.4.2) (2026-06-27)
+
+
+### Bug Fixes
+
+* **report:** simplify PR comment markdown output ([#20](https://github.com/jordan-simonovski/helmcov/issues/20)) ([6f3f89e](https://github.com/jordan-simonovski/helmcov/commit/6f3f89e75f8b4136784c05f3c0d10dcafe7ce648))
+
 ## [0.4.1](https://github.com/jordan-simonovski/helmcov/compare/v0.4.0...v0.4.1) (2026-06-27)
 
 
