@@ -27,6 +27,26 @@ if [ "$VERSION" = "dev" ]; then
   exit 0
 fi
 
+resolve_latest_version() {
+  local tag
+  tag="$(
+    curl -fsSL \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REPO}/releases/latest" \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])'
+  )" || true
+  if [ -z "${tag:-}" ]; then
+    echo "failed to resolve latest release for ${REPO}" >&2
+    return 1
+  fi
+  printf '%s' "$tag"
+}
+
+if [ "$VERSION" = "latest" ]; then
+  VERSION="$(resolve_latest_version)"
+  echo "resolved latest helmcov release: ${VERSION}" >&2
+fi
+
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 case "$ARCH" in
