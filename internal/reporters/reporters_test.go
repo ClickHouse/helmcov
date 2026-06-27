@@ -96,8 +96,9 @@ func TestWriteMarkdownIncludesSummaryAndMarker(t *testing.T) {
 
 	var buf bytes.Buffer
 	if err := WriteMarkdown(report, &buf, MarkdownOptions{
-		Threshold:     70,
-		CommentMarker: "helmcov-comment",
+		Threshold:       70,
+		CommentMarker:   "helmcov-comment",
+		ShowFileSummary: true,
 	}); err != nil {
 		t.Fatalf("write markdown: %v", err)
 	}
@@ -117,6 +118,59 @@ func TestWriteMarkdownIncludesSummaryAndMarker(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in markdown output:\n%s", want, got)
 		}
+	}
+}
+
+func TestWriteMarkdownHidesFileSummaryByDefault(t *testing.T) {
+	t.Parallel()
+
+	report := coverage.Report{
+		Files: map[string]coverage.FileCoverage{
+			"templates/configmap.yaml": {
+				Lines: map[int]int{1: 1},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := WriteMarkdown(report, &buf, MarkdownOptions{}); err != nil {
+		t.Fatalf("write markdown: %v", err)
+	}
+
+	got := buf.String()
+	if strings.Contains(got, "### Per-file summary") {
+		t.Fatalf("expected per-file summary to be hidden by default:\n%s", got)
+	}
+	if !strings.Contains(got, "#### templates/configmap.yaml") {
+		t.Fatalf("expected uncovered details for chart templates:\n%s", got)
+	}
+}
+
+func TestWriteMarkdownExcludesTplSourcesByDefault(t *testing.T) {
+	t.Parallel()
+
+	report := coverage.Report{
+		Files: map[string]coverage.FileCoverage{
+			"templates/deployment.yaml": {
+				Lines: map[int]int{1: 1},
+			},
+			"tpl:135df8fd": {
+				Lines: map[int]int{1: 0},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := WriteMarkdown(report, &buf, MarkdownOptions{ShowFileSummary: true}); err != nil {
+		t.Fatalf("write markdown: %v", err)
+	}
+
+	got := buf.String()
+	if strings.Contains(got, "tpl:135df8fd") {
+		t.Fatalf("expected tpl sources to be excluded by default:\n%s", got)
+	}
+	if !strings.Contains(got, "templates/deployment.yaml") {
+		t.Fatalf("expected chart templates to remain:\n%s", got)
 	}
 }
 

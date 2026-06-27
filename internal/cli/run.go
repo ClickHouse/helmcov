@@ -173,8 +173,10 @@ func writeRequestedFormats(cfg Config, report coverage.Report) error {
 		case "markdown":
 			if err := writeToFile(cfg.MarkdownPath, func(w io.Writer) error {
 				return reporters.WriteMarkdown(report, w, reporters.MarkdownOptions{
-					Threshold:     cfg.Threshold,
-					CommentMarker: cfg.CommentMarker,
+					Threshold:         cfg.Threshold,
+					CommentMarker:     cfg.CommentMarker,
+					ShowFileSummary:   cfg.MarkdownFileSummary,
+					IncludeTplSources: cfg.MarkdownIncludeTpl,
 				})
 			}); err != nil {
 				return fmt.Errorf("write markdown: %w", err)

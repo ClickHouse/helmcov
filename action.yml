@@ -57,6 +57,14 @@ inputs:
     description: Path for markdown PR comment output written by helmcov.
     required: false
     default: helmcov-coverage.md
+  file-summary:
+    description: Include the per-file coverage table in the PR comment.
+    required: false
+    default: "false"
+  include-tpl-sources:
+    description: Include tpl(...) inline template sources (tpl:<hash>) in markdown output.
+    required: false
+    default: "false"
 
 outputs:
   line-coverage:
@@ -99,6 +107,12 @@ runs:
           --seed "${{ inputs.seed }}"
           --kube-version "${{ inputs.kube-version }}"
         )
+        if [ "${{ inputs.file-summary }}" = "true" ]; then
+          ARGS+=(--markdown-file-summary)
+        fi
+        if [ "${{ inputs.include-tpl-sources }}" = "true" ]; then
+          ARGS+=(--markdown-include-tpl)
+        fi
         if [ -n "${{ inputs.charts }}" ]; then
           ARGS+=(--charts "${{ inputs.charts }}")
         elif [ -n "${{ inputs.chart }}" ]; then
