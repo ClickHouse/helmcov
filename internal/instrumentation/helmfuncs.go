@@ -34,8 +34,8 @@ func baseHelmFuncMap() template.FuncMap {
 		"fromJsonArray": fromJSONArray,
 		"include":       func(string, any) (string, error) { return "", fmt.Errorf("include not bound") },
 		"tpl":           func(string, any) (string, error) { return "", fmt.Errorf("tpl not bound") },
-		"required":      required,
-		"fail":          fail,
+		"required":      requiredFunc(false),
+		"fail":          failFunc(false),
 		"lookup":        lookup,
 	}
 	maps.Copy(funcMap, extras)
@@ -47,6 +47,8 @@ func bindHelmTemplateFuncs(t *template.Template, trace *Trace) {
 	funcMap := baseHelmFuncMap()
 	funcMap["include"] = includeFun(t, includedNames)
 	funcMap["tpl"] = tplFun(t, includedNames, trace)
+	funcMap["required"] = requiredFunc(true)
+	funcMap["fail"] = failFunc(true)
 	t.Funcs(funcMap)
 }
 
@@ -125,18 +127,31 @@ func mustToYAML(value any) string {
 	return strings.TrimSuffix(string(data), "\n")
 }
 
-func required(message string, value any) (any, error) {
-	if value == nil {
-		return nil, errors.New(message)
+func requiredFunc(lintMode bool) func(string, any) (any, error) {
+	return func(message string, value any) (any, error) {
+		if value == nil {
+			if lintMode {
+				return "", nil
+			}
+			return nil, errors.New(message)
+		}
+		if typed, ok := value.(string); ok && typed == "" {
+			if lintMode {
+				return "", nil
+			}
+			return nil, errors.New(message)
+		}
+		return value, nil
 	}
-	if typed, ok := value.(string); ok && typed == "" {
-		return nil, errors.New(message)
-	}
-	return value, nil
 }
 
-func fail(message string) (string, error) {
-	return "", errors.New(message)
+func failFunc(lintMode bool) func(string) (string, error) {
+	return func(message string) (string, error) {
+		if lintMode {
+			return "", nil
+		}
+		return "", errors.New(message)
+	}
 }
 
 func lookup(string, string, string, string) (map[string]any, error) {

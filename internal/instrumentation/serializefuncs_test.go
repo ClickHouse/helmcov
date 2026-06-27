@@ -138,3 +138,24 @@ func TestRenderAndTraceSupportsTemplateContext(t *testing.T) {
 		t.Fatalf("expected template metadata, got %q", rendered)
 	}
 }
+
+func TestRenderAndTraceContinuesOnFailInLintMode(t *testing.T) {
+	t.Parallel()
+
+	exec := NewExecutor()
+	template := `{{ if .Values.enabled }}{{ fail "invalid values" }}after-fail{{ end }}`
+	values := map[string]any{
+		"Values": map[string]any{"enabled": true},
+	}
+
+	trace, rendered, err := exec.RenderAndTrace("ingress.yaml", template, values, nil)
+	if err != nil {
+		t.Fatalf("render trace: %v", err)
+	}
+	if !strings.Contains(rendered, "after-fail") {
+		t.Fatalf("expected render to continue past fail, got %q", rendered)
+	}
+	if trace.Lines["ingress.yaml:1"] == 0 {
+		t.Fatalf("expected fail line to be traced")
+	}
+}
