@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/jordan-simonovski/helmcov/compare/v0.4.2...v0.4.3) (2026-06-27)
+
+
+### Bug Fixes
+
+* action version pinned to latest ([#22](https://github.com/jordan-simonovski/helmcov/issues/22)) ([197cc79](https://github.com/jordan-simonovski/helmcov/commit/197cc79935a863b21a9c08fe98fbd959a26af3ae))
+
 ## [0.4.2](https://github.com/jordan-simonovski/helmcov/compare/v0.4.1...v0.4.2) (2026-06-27)
 
 
