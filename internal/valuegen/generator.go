@@ -85,12 +85,28 @@ func collectVariants(current map[string]any, prefix string, out *[]variant) {
 		case map[string]any:
 			if len(typed) == 0 {
 				*out = append(*out, variant{path: path, value: map[string]any{"generated": true}})
-			} else {
-				*out = append(*out, variant{path: path, value: map[string]any{}})
 			}
 			collectVariants(typed, path, out)
+		case map[any]any:
+			asStringMap := normalizeAnyMap(typed)
+			if len(asStringMap) == 0 {
+				*out = append(*out, variant{path: path, value: map[string]any{"generated": true}})
+			}
+			collectVariants(asStringMap, path, out)
 		}
 	}
+}
+
+func normalizeAnyMap(src map[any]any) map[string]any {
+	out := make(map[string]any, len(src))
+	for key, value := range src {
+		keyString, ok := key.(string)
+		if !ok {
+			continue
+		}
+		out[keyString] = value
+	}
+	return out
 }
 
 func deepCopy(src map[string]any) map[string]any {
@@ -121,6 +137,13 @@ func setPath(root map[string]any, path string, value any) {
 	current := root
 	for i, part := range parts {
 		if i == len(parts)-1 {
+			if emptyMap, ok := value.(map[string]any); ok && len(emptyMap) == 0 {
+				if existing, exists := current[part]; exists {
+					if existingMap, mapOK := existing.(map[string]any); mapOK && len(existingMap) > 0 {
+						return
+					}
+				}
+			}
 			current[part] = value
 			return
 		}
