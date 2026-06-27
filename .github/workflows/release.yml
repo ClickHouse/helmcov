@@ -40,6 +40,20 @@ jobs:
           path: dist
           if-no-files-found: error
 
+  update-action-tag:
+    runs-on: ubuntu-latest
+    needs: goreleaser
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update v1 action tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f v1 "${GITHUB_SHA}"
+          git push origin v1 --force
+
   vendor-artifacts:
     runs-on: ubuntu-latest
     needs: goreleaser

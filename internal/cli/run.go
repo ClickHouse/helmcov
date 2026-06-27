@@ -170,6 +170,15 @@ func writeRequestedFormats(cfg Config, report coverage.Report) error {
 			}); err != nil {
 				return fmt.Errorf("write cobertura XML: %w", err)
 			}
+		case "markdown":
+			if err := writeToFile(cfg.MarkdownPath, func(w io.Writer) error {
+				return reporters.WriteMarkdown(report, w, reporters.MarkdownOptions{
+					Threshold:     cfg.Threshold,
+					CommentMarker: cfg.CommentMarker,
+				})
+			}); err != nil {
+				return fmt.Errorf("write markdown: %w", err)
+			}
 		default:
 			return fmt.Errorf("unsupported format %q", format)
 		}

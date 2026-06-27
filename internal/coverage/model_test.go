@@ -89,3 +89,25 @@ func TestReportUncoveredHelpers(t *testing.T) {
 		t.Fatalf("unexpected uncovered branches: %v", uncoveredBranches)
 	}
 }
+
+func TestFileBranchRate(t *testing.T) {
+	t.Parallel()
+
+	report := Report{
+		Files: map[string]FileCoverage{
+			"templates/a.yaml": {
+				Branches: map[string]int{
+					"1:if:true":  1,
+					"1:if:false": 0,
+				},
+			},
+		},
+	}
+
+	if got := report.FileBranchRate("templates/a.yaml"); got != 0.5 {
+		t.Fatalf("expected 50%% branch rate, got %v", got)
+	}
+	if got := report.FileBranchRate("missing.yaml"); got != 0 {
+		t.Fatalf("expected 0 for missing file, got %v", got)
+	}
+}

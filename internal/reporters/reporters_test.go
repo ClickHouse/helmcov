@@ -75,3 +75,68 @@ func TestWriteCoberturaXML(t *testing.T) {
 		t.Fatalf("missing line entry: %s", got)
 	}
 }
+
+func TestWriteMarkdownIncludesSummaryAndMarker(t *testing.T) {
+	t.Parallel()
+
+	report := coverage.Report{
+		Files: map[string]coverage.FileCoverage{
+			"templates/configmap.yaml": {
+				Lines: map[int]int{
+					1: 1,
+					2: 0,
+				},
+				Branches: map[string]int{
+					"1:if:true":  1,
+					"1:if:false": 0,
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := WriteMarkdown(report, &buf, MarkdownOptions{
+		Threshold:     70,
+		CommentMarker: "helmcov-comment",
+	}); err != nil {
+		t.Fatalf("write markdown: %v", err)
+	}
+
+	got := buf.String()
+	for _, want := range []string{
+		"<!-- helmcov-comment -->",
+		"## Helm template coverage",
+		"| Line coverage | 50.00% |",
+		"| Branch coverage | 50.00% |",
+		"| Threshold | 70% (not met) |",
+		"| templates/configmap.yaml | 50.00% | 50.00% |",
+		"<summary>Uncovered details</summary>",
+		"**Uncovered lines:** 2",
+		"**Uncovered branches:** 1:if:false",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in markdown output:\n%s", want, got)
+		}
+	}
+}
+
+func TestWriteMarkdownReportsThresholdMet(t *testing.T) {
+	t.Parallel()
+
+	report := coverage.Report{
+		Files: map[string]coverage.FileCoverage{
+			"templates/configmap.yaml": {
+				Lines: map[int]int{1: 1},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := WriteMarkdown(report, &buf, MarkdownOptions{Threshold: 50}); err != nil {
+		t.Fatalf("write markdown: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "| Threshold | 50% (met) |") {
+		t.Fatalf("expected threshold met marker, got:\n%s", buf.String())
+	}
+}

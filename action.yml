@@ -1,0 +1,130 @@
+name: helmcov
+description: Run Helm template coverage and comment results on pull requests.
+branding:
+  icon: activity
+  color: blue
+
+inputs:
+  chart:
+    description: Path to a Helm chart root (must include Chart.yaml).
+    required: false
+    default: ""
+  tests:
+    description: Path to helm-unittest suites. Defaults to <chart>/tests in single-chart mode.
+    required: false
+    default: ""
+  charts:
+    description: Root directory containing nested charts (monorepo mode). Mutually exclusive with chart.
+    required: false
+    default: ""
+  threshold:
+    description: Minimum line coverage percentage (0-100). Fails the step when coverage is lower.
+    required: false
+    default: "0"
+  version:
+    description: helmcov release tag to install (for example v0.3.3), or dev to build from source.
+    required: false
+    default: v0.3.3
+  repository:
+    description: GitHub repository that hosts helmcov release assets.
+    required: false
+    default: jordan-simonovski/helmcov
+  comment:
+    description: Post or update a pull request comment with markdown coverage results.
+    required: false
+    default: "true"
+  comment-marker:
+    description: HTML comment marker used to upsert the same PR comment across pushes.
+    required: false
+    default: helmcov-comment
+  token:
+    description: GitHub token for PR comments.
+    required: false
+    default: ${{ github.token }}
+  max-scenarios:
+    description: Maximum generated value scenarios per suite.
+    required: false
+    default: "20"
+  seed:
+    description: Random seed for deterministic scenario ordering.
+    required: false
+    default: "42"
+  kube-version:
+    description: Kubernetes version passed to Helm .Capabilities context.
+    required: false
+    default: 1.28.0
+  markdown-file:
+    description: Path for markdown PR comment output written by helmcov.
+    required: false
+    default: helmcov-coverage.md
+
+outputs:
+  line-coverage:
+    description: Overall line coverage percentage.
+  branch-coverage:
+    description: Overall branch coverage percentage.
+  markdown-file:
+    description: Path to the generated markdown coverage report.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      if: inputs.version == 'dev'
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+
+    - name: Install helmcov
+      shell: bash
+      run: |
+        "${{ github.action_path }}/scripts/action-install.sh" \
+          "${{ inputs.version }}" \
+          "${{ inputs.repository }}" \
+          "${{ runner.temp }}/helmcov-bin"
+
+    - name: Run helmcov
+      id: run
+      shell: bash
+      continue-on-error: true
+      run: |
+        set -euo pipefail
+        HELMcov="${{ runner.temp }}/helmcov-bin/helmcov"
+        MARKDOWN_FILE="${{ inputs.markdown-file }}"
+        ARGS=(
+          --format markdown
+          --markdown-file "$MARKDOWN_FILE"
+          --comment-marker "${{ inputs.comment-marker }}"
+          --threshold "${{ inputs.threshold }}"
+          --max-scenarios "${{ inputs.max-scenarios }}"
+          --seed "${{ inputs.seed }}"
+          --kube-version "${{ inputs.kube-version }}"
+        )
+        if [ -n "${{ inputs.charts }}" ]; then
+          ARGS+=(--charts "${{ inputs.charts }}")
+        elif [ -n "${{ inputs.chart }}" ]; then
+          ARGS+=(--chart "${{ inputs.chart }}")
+          if [ -n "${{ inputs.tests }}" ]; then
+            ARGS+=(--tests "${{ inputs.tests }}")
+          fi
+        else
+          echo "either chart or charts input is required" >&2
+          exit 1
+        fi
+        "${{ github.action_path }}/scripts/action-run.sh" "$HELMcov" "$MARKDOWN_FILE" "${ARGS[@]}"
+
+    - name: Comment on pull request
+      if: always() && inputs.comment == 'true' && github.event_name == 'pull_request' && steps.run.outputs.markdown-file != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        "${{ github.action_path }}/scripts/action-comment.sh" \
+          "${{ inputs.comment-marker }}" \
+          "${{ inputs.markdown-file }}" \
+          "${{ inputs.token }}"
+
+    - name: Fail when coverage is below threshold
+      if: steps.run.outcome == 'failure'
+      shell: bash
+      run: exit 1

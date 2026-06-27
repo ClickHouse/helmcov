@@ -88,6 +88,53 @@ func TestRunWritesRequestedCoverageOutputs(t *testing.T) {
 	}
 }
 
+func TestRunWritesMarkdownOutput(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	chartDir := filepath.Join(base, "chart")
+	testsDir := filepath.Join(base, "tests")
+	templatesDir := filepath.Join(chartDir, "templates")
+	if err := os.MkdirAll(templatesDir, 0o755); err != nil {
+		t.Fatalf("create templates dir: %v", err)
+	}
+	if err := os.MkdirAll(testsDir, 0o755); err != nil {
+		t.Fatalf("create tests dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(chartDir, "Chart.yaml"), []byte("apiVersion: v2\nname: demo\nversion: 0.1.0\n"), 0o644); err != nil {
+		t.Fatalf("write chart: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(chartDir, "values.yaml"), []byte("enabled: true\n"), 0o644); err != nil {
+		t.Fatalf("write values: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "configmap.yaml"), []byte("{{ if .Values.enabled }}yes{{ else }}no{{ end }}\n"), 0o644); err != nil {
+		t.Fatalf("write template: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(testsDir, "demo_test.yaml"), []byte("suite: smoke\ntemplates:\n  - templates/configmap.yaml\n"), 0o644); err != nil {
+		t.Fatalf("write suite: %v", err)
+	}
+
+	mdOut := filepath.Join(base, "coverage.md")
+	var out bytes.Buffer
+	err := Run([]string{
+		"--chart", chartDir,
+		"--tests", testsDir,
+		"--format", "markdown",
+		"--markdown-file", mdOut,
+	}, &out)
+	if err != nil {
+		t.Fatalf("unexpected run error: %v", err)
+	}
+
+	content, err := os.ReadFile(mdOut)
+	if err != nil {
+		t.Fatalf("expected markdown output file: %v", err)
+	}
+	if !strings.Contains(string(content), "<!-- helmcov-comment -->") {
+		t.Fatalf("expected comment marker in markdown output: %s", content)
+	}
+}
+
 func TestRunReportsMissingBranchCoverage(t *testing.T) {
 	t.Parallel()
 
