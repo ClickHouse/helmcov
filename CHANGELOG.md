@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/jordan-simonovski/helmcov/compare/v0.3.3...v0.4.0) (2026-06-27)
+
+
+### Features
+
+* **ci:** publish GitHub Action with PR coverage comments ([#16](https://github.com/jordan-simonovski/helmcov/issues/16)) ([db68eaa](https://github.com/jordan-simonovski/helmcov/commit/db68eaa277d29104c2e333fa778fdb17b687c81a))
+
 ## [0.3.3](https://github.com/jordan-simonovski/helmcov/compare/v0.3.2...v0.3.3) (2026-06-27)
 
 
