@@ -22,9 +22,9 @@ inputs:
     required: false
     default: "0"
   version:
-    description: helmcov release tag to install (for example v0.4.0), or dev to build from source.
+    description: helmcov release tag (for example v0.4.2), latest for the newest release, or dev to build from source.
     required: false
-    default: v0.4.0
+    default: latest
   repository:
     description: GitHub repository that hosts helmcov release assets.
     required: false
