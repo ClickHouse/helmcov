@@ -110,7 +110,7 @@ go run ./cmd/helmcov \
 
 ## GitHub Actions integration
 
-CI (`.github/workflows/ci.yml`) runs on pull requests and enforces:
+CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`, and enforces:
 
 - `gofmt` formatting checks
 - `go vet` and `golangci-lint` linting
