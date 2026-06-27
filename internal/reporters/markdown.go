@@ -9,8 +9,10 @@ import (
 )
 
 type MarkdownOptions struct {
-	Threshold     float64
-	CommentMarker string
+	Threshold         float64
+	CommentMarker     string
+	ShowFileSummary   bool
+	IncludeTplSources bool
 }
 
 func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOptions) error {
@@ -22,6 +24,7 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 	lineRate := report.LineRate() * 100
 	branchRate := report.BranchRate() * 100
 	thresholdStatus := thresholdStatus(lineRate, opts.Threshold)
+	files := markdownFiles(report, opts.IncludeTplSources)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "<!-- %s -->\n\n", marker)
@@ -35,8 +38,7 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 	}
 	b.WriteString("\n")
 
-	files := sortedFiles(report)
-	if len(files) > 0 {
+	if opts.ShowFileSummary && len(files) > 0 {
 		b.WriteString("### Per-file summary\n\n")
 		b.WriteString("| Template | Line | Branch |\n")
 		b.WriteString("|----------|-----:|-----:|\n")
@@ -50,6 +52,11 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 			)
 		}
 		b.WriteString("\n")
+	}
+
+	if len(files) == 0 {
+		_, err := io.WriteString(writer, b.String())
+		return err
 	}
 
 	b.WriteString("<details>\n<summary>Uncovered details</summary>\n\n")
@@ -77,6 +84,25 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 
 	_, err := io.WriteString(writer, b.String())
 	return err
+}
+
+func markdownFiles(report coverage.Report, includeTplSources bool) []string {
+	files := sortedFiles(report)
+	if includeTplSources {
+		return files
+	}
+	filtered := make([]string, 0, len(files))
+	for _, file := range files {
+		if isTplSource(file) {
+			continue
+		}
+		filtered = append(filtered, file)
+	}
+	return filtered
+}
+
+func isTplSource(file string) bool {
+	return strings.HasPrefix(file, "tpl:")
 }
 
 func thresholdStatus(lineRate float64, threshold float64) string {
