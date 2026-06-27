@@ -20,6 +20,8 @@ type Config struct {
 	Seed               int64
 	GoCoverProfilePath string
 	CoberturaPath      string
+	MarkdownPath       string
+	CommentMarker      string
 	KubeVersion        string
 }
 
@@ -40,6 +42,8 @@ func ParseConfig(args []string) (Config, error) {
 	fs.Int64Var(&cfg.Seed, "seed", 42, "seed for generated scenarios")
 	fs.StringVar(&cfg.GoCoverProfilePath, "go-coverprofile", "coverage.out", "path for go coverprofile output")
 	fs.StringVar(&cfg.CoberturaPath, "cobertura-file", "coverage.xml", "path for cobertura XML output")
+	fs.StringVar(&cfg.MarkdownPath, "markdown-file", "coverage.md", "path for markdown PR comment output")
+	fs.StringVar(&cfg.CommentMarker, "comment-marker", "helmcov-comment", "HTML comment marker for markdown PR output")
 	fs.StringVar(&cfg.KubeVersion, "kube-version", "1.28.0", "Kubernetes version for .Capabilities context")
 	fs.BoolVar(&cfg.Verbose, "verbose", false, "print per-file and uncovered coverage details")
 
@@ -91,10 +95,13 @@ func ParseConfig(args []string) (Config, error) {
 	if cfg.CoberturaPath == "" {
 		return Config{}, errors.New("--cobertura-file must not be empty")
 	}
+	if cfg.MarkdownPath == "" {
+		return Config{}, errors.New("--markdown-file must not be empty")
+	}
 
 	for _, format := range cfg.Formats {
 		switch format {
-		case "go", "cobertura":
+		case "go", "cobertura", "markdown":
 		default:
 			return Config{}, fmt.Errorf("unsupported format %q", format)
 		}

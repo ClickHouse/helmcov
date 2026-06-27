@@ -70,12 +70,16 @@ Mode rules:
 
 ### Optional flags
 
-- `--format`: output format (`go`, `cobertura`), repeatable
+- `--format`: output format (`go`, `cobertura`, `markdown`), repeatable
   - default: both `go` and `cobertura`
 - `--go-coverprofile`: output file for Go coverprofile
   - default: `coverage.out`
 - `--cobertura-file`: output file for Cobertura XML
   - default: `coverage.xml`
+- `--markdown-file`: output file for markdown PR comment report
+  - default: `coverage.md`
+- `--comment-marker`: HTML comment marker embedded in markdown output
+  - default: `helmcov-comment`
 - `--threshold`: minimum line coverage percentage (0-100)
   - command fails if actual line coverage is lower
 - `--max-scenarios`: cap for generated value scenarios per suite
@@ -110,6 +114,65 @@ go run ./cmd/helmcov \
 
 ## GitHub Actions integration
 
+### Published action (recommended)
+
+Add Helm template coverage to pull requests with a single step. The action
+installs a release binary, runs helmcov, and upserts a PR comment with
+line/branch coverage and uncovered details.
+
+```yaml
+name: helm-coverage
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  helmcov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jordan-simonovski/helmcov@v1
+        with:
+          chart: charts/my-app
+          tests: charts/my-app/tests
+          threshold: "70"
+```
+
+Monorepo mode:
+
+```yaml
+      - uses: jordan-simonovski/helmcov@v1
+        with:
+          charts: charts
+          threshold: "65"
+```
+
+Action inputs:
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `chart` | Path to chart root | — |
+| `tests` | Path to helm-unittest suites | `<chart>/tests` |
+| `charts` | Monorepo charts root | — |
+| `threshold` | Minimum line coverage % | `0` |
+| `version` | Release tag (`v0.3.3`) or `dev` | `v0.3.3` |
+| `comment` | Post/update PR comment | `true` |
+| `comment-marker` | Marker for comment upsert | `helmcov-comment` |
+
+Requirements for consuming repositories:
+
+- helm-unittest suites (`*_test.yaml`) under the chart tests directory
+- `pull-requests: write` when PR comments are enabled
+
+This repository dogfoods the action in `.github/workflows/helmcov-action.yml`
+using `version: dev` to build from source on pull requests.
+
+### CI in this repository
+
 CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`, and enforces:
 
 - `gofmt` formatting checks
@@ -120,20 +183,7 @@ CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`, and 
 
 The workflow executes `make ci` so CI and local checks stay aligned.
 
-## Local commit-msg gate
-
-Conventional commit validation runs locally via a native git `commit-msg` hook.
-
-Setup:
-
-```bash
-make hooks
-```
-
-The hook source lives in `.githooks/commit-msg` and validates commit subjects
-with `scripts/validate-conventional-commit.sh`.
-
-### Binary mode
+### Manual workflow (binary)
 
 ```yaml
 name: helmcov
@@ -161,22 +211,18 @@ jobs:
             coverage.xml
 ```
 
-### Docker mode
+## Local commit-msg gate
 
-```yaml
-name: helmcov-docker
-on: [pull_request]
-jobs:
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t helmcov:ci .
-      - run: |
-          docker run --rm -v "$PWD:/work" -w /work helmcov:ci \
-            --chart examples/basic-chart \
-            --tests examples/basic-chart/tests
+Conventional commit validation runs locally via a native git `commit-msg` hook.
+
+Setup:
+
+```bash
+make hooks
 ```
+
+The hook source lives in `.githooks/commit-msg` and validates commit subjects
+with `scripts/validate-conventional-commit.sh`.
 
 ## Release and vendoring workflows
 
