@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/jordan-simonovski/helmcov/compare/v0.3.0...v0.3.1) (2026-06-27)
+
+
+### Bug Fixes
+
+* Fixing valuegen issues ([#9](https://github.com/jordan-simonovski/helmcov/issues/9)) ([1b1173f](https://github.com/jordan-simonovski/helmcov/commit/1b1173fa59655e0778dfc9ac7b7fbfdc72c3c668))
+
 ## [0.3.0](https://github.com/jordan-simonovski/helmcov/compare/v0.2.0...v0.3.0) (2026-06-27)
 
 
