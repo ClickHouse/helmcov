@@ -159,7 +159,7 @@ Action inputs:
 | `tests` | Path to helm-unittest suites | `<chart>/tests` |
 | `charts` | Monorepo charts root | — |
 | `threshold` | Minimum line coverage % | `0` |
-| `version` | Release tag (`v0.3.3`) or `dev` | `v0.3.3` |
+| `version` | Release tag (`v0.4.0`) or `dev` | `v0.4.0` |
 | `comment` | Post/update PR comment | `true` |
 | `comment-marker` | Marker for comment upsert | `helmcov-comment` |
 
