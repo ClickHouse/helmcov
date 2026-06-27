@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/jordan-simonovski/helmcov/compare/v0.3.1...v0.3.2) (2026-06-27)
+
+
+### Bug Fixes
+
+* resolving CI issues ([#12](https://github.com/jordan-simonovski/helmcov/issues/12)) ([090f340](https://github.com/jordan-simonovski/helmcov/commit/090f3409f498c7066e9d1249ae15982c9e3bc701))
+
 ## [0.3.1](https://github.com/jordan-simonovski/helmcov/compare/v0.3.0...v0.3.1) (2026-06-27)
 
 
