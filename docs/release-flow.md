@@ -19,7 +19,8 @@ publishing to GHCR, and vendored release artifacts.
    - downloads GoReleaser `dist/` artifact from the previous job
    - writes GHCR image refs
    - uploads everything as reusable workflow artifact
-6. `vendor-artifacts.yml` remains available as a manual fallback workflow.
+6. `release.yml` updates the floating `v1` Git tag used by `uses: .../helmcov@v1`.
+7. `vendor-artifacts.yml` remains available as a manual fallback workflow.
 
 > Important: to allow downstream tag-triggered workflows (`release.yml`) after
 > Release Please creates a tag/release, configure repository secret

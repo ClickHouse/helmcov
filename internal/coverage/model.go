@@ -92,6 +92,24 @@ func (r Report) FileCoveredLineCount(file string) (covered int, total int) {
 	return covered, total
 }
 
+func (r Report) FileBranchRate(file string) float64 {
+	fc, ok := r.Files[file]
+	if !ok {
+		return 0
+	}
+	total := len(fc.Branches)
+	if total == 0 {
+		return 0
+	}
+	covered := 0
+	for _, hits := range fc.Branches {
+		if hits > 0 {
+			covered++
+		}
+	}
+	return float64(covered) / float64(total)
+}
+
 func (r Report) UncoveredLines(file string) []int {
 	fc, ok := r.Files[file]
 	if !ok {

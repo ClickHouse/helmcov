@@ -1,0 +1,35 @@
+name: helmcov-action
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run helmcov action (single chart)
+        uses: ./
+        with:
+          chart: examples/branch-heavy-chart
+          tests: examples/branch-heavy-chart/tests
+          version: dev
+          threshold: "0"
+
+  monorepo-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run helmcov action (monorepo)
+        uses: ./
+        with:
+          charts: examples/monorepo/charts
+          version: dev
+          comment: "false"

@@ -3,13 +3,22 @@
 ## Integrating into an existing chart repository
 
 1. Ensure helm-unittest suites exist for your chart.
-2. Add a CI step that runs:
+2. Add the GitHub Action (recommended):
+
+```yaml
+- uses: jordan-simonovski/helmcov@v1
+  with:
+    chart: charts/my-app
+    threshold: "70"
+```
+
+Or run helmcov directly in CI:
 
 ```bash
 helmcov --chart <chart-root> --tests <chart-root>/tests --format go --format cobertura
 ```
 
-3. Upload `coverage.out` and `coverage.xml` as build artifacts.
+3. Upload `coverage.out` and `coverage.xml` as build artifacts when not using the action.
 4. Add `--threshold` once baseline coverage is understood.
 
 ## Recommended rollout
