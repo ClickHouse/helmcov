@@ -1,1 +1,2 @@
 deploymentMode: dev
+policy: 'mode={{ .Values.deploymentMode }}'

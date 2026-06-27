@@ -17,8 +17,9 @@ type Bundle struct {
 }
 
 type ChartMeta struct {
-	Name    string `yaml:"name"`
-	Version string `yaml:"version"`
+	Name       string `yaml:"name"`
+	Version    string `yaml:"version"`
+	AppVersion string `yaml:"appVersion"`
 }
 
 type Suite struct {

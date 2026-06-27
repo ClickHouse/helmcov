@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
-	"strconv"
+	"sort"
 	"strings"
 	"text/template"
 	"text/template/parse"
@@ -21,15 +21,33 @@ func NewExecutor() *Executor {
 	return &Executor{}
 }
 
-func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[string]any) (Trace, string, error) {
+func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[string]any, sharedTemplates map[string]string) (Trace, string, error) {
 	trace := Trace{
 		Lines:    map[string]int{},
 		Branches: map[string]int{},
 	}
 
-	parsed, err := template.New(templateName).Funcs(defaultFuncMap()).Option("missingkey=zero").Parse(tpl)
-	if err != nil {
-		return trace, "", fmt.Errorf("parse template %s: %w", templateName, err)
+	sources := map[string]string{}
+	for path, content := range sharedTemplates {
+		sources[path] = content
+	}
+	sources[templateName] = tpl
+
+	root := template.New("gotpl").Option("missingkey=zero")
+	bindHelmTemplateFuncs(root, &trace)
+	for _, path := range sortedKeys(sources) {
+		if _, err := root.New(path).Parse(sources[path]); err != nil {
+			return trace, "", fmt.Errorf("parse template %s: %w", path, err)
+		}
+	}
+
+	parsed := root.Lookup(templateName)
+	if parsed == nil {
+		return trace, "", fmt.Errorf("template %s not found after parse", templateName)
+	}
+
+	for path, content := range sources {
+		registerTemplateLines(path, content, trace.Lines)
 	}
 
 	var rendered bytes.Buffer
@@ -37,10 +55,10 @@ func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[st
 		return trace, "", fmt.Errorf("execute template %s: %w", templateName, err)
 	}
 
-	registerTemplateLines(templateName, tpl, trace.Lines)
-	walkTree(parsed.Root, templateName, parsed, values, tpl, &trace)
+	walkTree(parsed.Root, templateName, root, values, tpl, &trace)
+	traceDefinedTemplates(root, sources, values, &trace)
+
 	if !hasCoveredLines(trace.Lines) {
-		// Fallback for templates where parse nodes do not expose stable positions.
 		for lineKey := range trace.Lines {
 			trace.Lines[lineKey] = 1
 		}
@@ -49,12 +67,62 @@ func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[st
 	return trace, rendered.String(), nil
 }
 
+func sortedKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func traceDefinedTemplates(parsed *template.Template, sources map[string]string, values map[string]any, trace *Trace) {
+	seen := map[string]bool{}
+	for _, tmpl := range parsed.Templates() {
+		name := tmpl.Name()
+		if name == "" || name == "gotpl" || seen[name] {
+			continue
+		}
+		if _, isFileTemplate := sources[name]; isFileTemplate {
+			continue
+		}
+		if parsed.Lookup(name) == nil || tmpl.Tree == nil {
+			continue
+		}
+		seen[name] = true
+		sourcePath, sourceContent := findDefineSource(name, sources)
+		if sourcePath == "" {
+			continue
+		}
+		walkTree(tmpl.Root, sourcePath, parsed, values, sourceContent, trace)
+	}
+}
+
+func findDefineSource(defineName string, sources map[string]string) (string, string) {
+	for path, content := range sources {
+		scanned, err := template.New("scan").Parse(content)
+		if err != nil {
+			continue
+		}
+		for _, tmpl := range scanned.Templates() {
+			if tmpl.Name() == defineName {
+				return path, content
+			}
+		}
+	}
+	return "", ""
+}
+
 func registerTemplateLines(templateName string, tpl string, lines map[string]int) {
 	for index, line := range strings.Split(tpl, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		lines[fmt.Sprintf("%s:%d", templateName, index+1)] = 0
+		key := fmt.Sprintf("%s:%d", templateName, index+1)
+		if _, exists := lines[key]; exists {
+			continue
+		}
+		lines[key] = 0
 	}
 }
 
@@ -175,9 +243,13 @@ func nodeLine(node parse.Node, tpl string) int {
 	return 1 + strings.Count(tpl[:pos-1], "\n")
 }
 
-func evalPipe(_ *template.Template, pipe string, values map[string]any) (bool, error) {
+func evalPipe(parsed *template.Template, pipe string, values map[string]any) (bool, error) {
 	check := fmt.Sprintf("{{if %s}}true{{else}}false{{end}}", pipe)
-	tpl, err := template.New("eval").Funcs(defaultFuncMap()).Option("missingkey=zero").Parse(check)
+	tpl, err := parsed.Clone()
+	if err != nil {
+		return false, err
+	}
+	tpl, err = tpl.New("eval").Parse(check)
 	if err != nil {
 		return false, err
 	}
@@ -188,9 +260,13 @@ func evalPipe(_ *template.Template, pipe string, values map[string]any) (bool, e
 	return strings.TrimSpace(buf.String()) == "true", nil
 }
 
-func evalRaw(_ *template.Template, pipe string, values map[string]any) (any, error) {
+func evalRaw(parsed *template.Template, pipe string, values map[string]any) (any, error) {
 	check := fmt.Sprintf("{{ $v := %s }}{{ printf \"%%#v\" $v }}", pipe)
-	tpl, err := template.New("eval").Funcs(defaultFuncMap()).Option("missingkey=zero").Parse(check)
+	tpl, err := parsed.Clone()
+	if err != nil {
+		return nil, err
+	}
+	tpl, err = tpl.New("eval").Parse(check)
 	if err != nil {
 		return nil, err
 	}
@@ -199,10 +275,6 @@ func evalRaw(_ *template.Template, pipe string, values map[string]any) (any, err
 		return nil, err
 	}
 
-	// Parsed raw string output isn't useful for structured checks, but the
-	// range iterable check below only needs empty/non-empty for common kinds.
-	// For deterministic behavior in v1, use direct lookup when expression is
-	// simple path like `.foo.bar`; otherwise fallback to truthy string test.
 	path := strings.TrimSpace(pipe)
 	if strings.HasPrefix(path, ".") {
 		if val, ok := lookupPath(values, path); ok {
@@ -245,12 +317,4 @@ func lookupPath(values map[string]any, path string) (any, bool) {
 		current = next
 	}
 	return current, true
-}
-
-func defaultFuncMap() template.FuncMap {
-	return template.FuncMap{
-		"quote": func(value any) string {
-			return strconv.Quote(fmt.Sprintf("%v", value))
-		},
-	}
 }

@@ -7,3 +7,9 @@ tests:
       - equal:
           path: data.mode
           value: dev
+      - equal:
+          path: data.policy
+          value: mode=dev
+      - equal:
+          path: data.note
+          value: development mode

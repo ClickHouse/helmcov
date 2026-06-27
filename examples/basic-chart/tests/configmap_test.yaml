@@ -7,6 +7,18 @@ tests:
       - equal:
           path: data.feature
           value: enabled
+      - matchRegex:
+          path: data.greeting
+          pattern: release-name-basic-chart
+      - equal:
+          path: data.notice
+          value: loaded from chart files
+      - equal:
+          path: data.theme
+          value: dark
+      - equal:
+          path: data.batchSupported
+          value: "true"
   - it: renders disabled feature from values file
     values:
       - tests/values/disabled.yaml

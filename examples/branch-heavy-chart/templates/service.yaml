@@ -2,7 +2,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: branch-heavy
+  name: {{ include "branch-heavy.fullname" . }}
+  labels:
+    {{- include "branch-heavy.labels" . | nindent 4 }}
+  annotations:
+    summary: {{ tpl .Values.service.summary . | quote }}
 spec:
   selector:
 {{ with .Values.labels }}
@@ -20,9 +24,12 @@ spec:
 {{ else }}
     - port: 0
 {{ end }}
+{{- if .Capabilities.APIVersions.Has "v1" }}
+  type: {{ .Values.service.type | default "ClusterIP" }}
+{{- end }}
 {{ else }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: branch-heavy-disabled
+  name: {{ include "branch-heavy.fullname" . }}-disabled
 {{ end }}

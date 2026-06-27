@@ -20,6 +20,7 @@ type Config struct {
 	Seed               int64
 	GoCoverProfilePath string
 	CoberturaPath      string
+	KubeVersion        string
 }
 
 func ParseConfig(args []string) (Config, error) {
@@ -39,6 +40,7 @@ func ParseConfig(args []string) (Config, error) {
 	fs.Int64Var(&cfg.Seed, "seed", 42, "seed for generated scenarios")
 	fs.StringVar(&cfg.GoCoverProfilePath, "go-coverprofile", "coverage.out", "path for go coverprofile output")
 	fs.StringVar(&cfg.CoberturaPath, "cobertura-file", "coverage.xml", "path for cobertura XML output")
+	fs.StringVar(&cfg.KubeVersion, "kube-version", "1.28.0", "Kubernetes version for .Capabilities context")
 	fs.BoolVar(&cfg.Verbose, "verbose", false, "print per-file and uncovered coverage details")
 
 	if err := fs.Parse(args); err != nil {

@@ -1,1 +1,2 @@
 deploymentMode: dev
+target: '{{ include "chart-b.fullname" . }}'

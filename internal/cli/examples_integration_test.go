@@ -2,9 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"testing"
 )
 
@@ -18,9 +21,10 @@ func TestRunAgainstExamples(t *testing.T) {
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
 
 	cases := []struct {
-		name  string
-		chart string
-		tests string
+		name            string
+		chart           string
+		tests           string
+		wantBranchBelow float64
 	}{
 		{
 			name:  "basic",
@@ -33,9 +37,10 @@ func TestRunAgainstExamples(t *testing.T) {
 			tests: filepath.Join(repoRoot, "examples", "branch-heavy-chart", "tests"),
 		},
 		{
-			name:  "low-coverage",
-			chart: filepath.Join(repoRoot, "examples", "low-coverage-chart"),
-			tests: filepath.Join(repoRoot, "examples", "low-coverage-chart", "tests"),
+			name:            "low-coverage",
+			chart:           filepath.Join(repoRoot, "examples", "low-coverage-chart"),
+			tests:           filepath.Join(repoRoot, "examples", "low-coverage-chart", "tests"),
+			wantBranchBelow: 100.0,
 		},
 	}
 
@@ -62,8 +67,25 @@ func TestRunAgainstExamples(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(base, "coverage.xml")); err != nil {
 				t.Fatalf("expected cobertura output: %v", err)
 			}
+			if tc.wantBranchBelow > 0 {
+				branchCoverage, err := parseBranchCoverage(out.String())
+				if err != nil {
+					t.Fatalf("parse branch coverage: %v", err)
+				}
+				if branchCoverage >= tc.wantBranchBelow {
+					t.Fatalf("expected branch coverage below %.2f%%, got %.2f%%", tc.wantBranchBelow, branchCoverage)
+				}
+			}
 		})
 	}
+}
+
+func parseBranchCoverage(output string) (float64, error) {
+	match := regexp.MustCompile(`branch-coverage=([0-9]+(?:\.[0-9]+)?)%`).FindStringSubmatch(output)
+	if len(match) != 2 {
+		return 0, fmt.Errorf("branch coverage summary not found in output")
+	}
+	return strconv.ParseFloat(match[1], 64)
 }
 
 func TestRunAgainstMonorepoExamples(t *testing.T) {

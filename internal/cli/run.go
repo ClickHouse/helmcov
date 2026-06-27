@@ -35,6 +35,14 @@ func Run(args []string, stdout io.Writer) error {
 		if loadErr != nil {
 			return loadErr
 		}
+		chartTemplates, templatesErr := chartloader.LoadTemplateFiles(target.ChartPath)
+		if templatesErr != nil {
+			return templatesErr
+		}
+		chartFiles, filesErr := chartloader.LoadChartFiles(target.ChartPath)
+		if filesErr != nil {
+			return filesErr
+		}
 		totalSuites += len(bundle.Suites)
 		for _, suite := range bundle.Suites {
 			scenarios := valuegen.Generate(suite.MergedValues, valuegen.Options{
@@ -42,18 +50,28 @@ func Run(args []string, stdout io.Writer) error {
 				Seed:         cfg.Seed,
 			})
 			for _, templatePath := range suite.Templates {
-				templateFile := templatePath
-				if !filepath.IsAbs(templateFile) {
-					templateFile = filepath.Join(target.ChartPath, templatePath)
+				templateFile, resolveErr := chartloader.ResolveTemplatePath(target.ChartPath, templatePath)
+				if resolveErr != nil {
+					return fmt.Errorf("resolve template %s: %w", templatePath, resolveErr)
 				}
 				content, readErr := os.ReadFile(templateFile)
 				if readErr != nil {
 					return fmt.Errorf("read template %s: %w", templateFile, readErr)
 				}
 				for _, scenario := range scenarios {
-					trace, _, traceErr := exec.RenderAndTrace(templateFile, string(content), map[string]any{
-						"Values": scenario,
-					})
+					trace, _, traceErr := exec.RenderAndTrace(
+						templateFile,
+						string(content),
+						chartloader.HelmRenderValues(chartloader.RenderOptions{
+							Chart:        bundle.Chart,
+							Values:       scenario,
+							ChartPath:    target.ChartPath,
+							TemplatePath: templateFile,
+							KubeVersion:  cfg.KubeVersion,
+							Files:        chartFiles,
+						}),
+						chartTemplates,
+					)
 					if traceErr != nil {
 						return fmt.Errorf("render template %s: %w", templatePath, traceErr)
 					}

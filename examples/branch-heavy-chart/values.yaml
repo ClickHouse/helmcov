@@ -1,5 +1,7 @@
 service:
   enabled: true
+  type: ClusterIP
+  summary: 'service for {{ include "branch-heavy.fullname" . }}'
 ports:
   - 80
 labels:

@@ -40,6 +40,31 @@ func TestParseConfigDefaultsTestsPathFromChart(t *testing.T) {
 	}
 }
 
+func TestParseConfigDefaultsKubeVersion(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	chartDir := filepath.Join(base, "chart")
+	testsDir := filepath.Join(chartDir, "tests")
+	if err := os.MkdirAll(testsDir, 0o755); err != nil {
+		t.Fatalf("create tests dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(chartDir, "Chart.yaml"), []byte("apiVersion: v2\nname: demo\nversion: 0.1.0\n"), 0o644); err != nil {
+		t.Fatalf("write chart: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(testsDir, "demo_test.yaml"), []byte("suite: smoke\n"), 0o644); err != nil {
+		t.Fatalf("write suite: %v", err)
+	}
+
+	cfg, err := ParseConfig([]string{"--chart", chartDir, "--kube-version", "1.30.0"})
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	if cfg.KubeVersion != "1.30.0" {
+		t.Fatalf("expected kube version 1.30.0, got %s", cfg.KubeVersion)
+	}
+}
+
 func TestParseConfigAcceptsChartsWithoutTestsFlag(t *testing.T) {
 	t.Parallel()
 

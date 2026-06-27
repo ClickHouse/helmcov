@@ -42,6 +42,24 @@ func TestFromTracesAggregatesHits(t *testing.T) {
 	}
 }
 
+func TestFromTracesAggregatesTplBranchKeys(t *testing.T) {
+	t.Parallel()
+
+	traces := []instrumentation.Trace{
+		{
+			Branches: map[string]int{
+				"tpl:abc123:2:if:true": 1,
+			},
+		},
+	}
+
+	report := FromTraces(traces)
+	file := report.Files["tpl:abc123"]
+	if file.Branches["2:if:true"] != 1 {
+		t.Fatalf("expected tpl branch aggregation, got %#v", file.Branches)
+	}
+}
+
 func TestReportUncoveredHelpers(t *testing.T) {
 	t.Parallel()
 

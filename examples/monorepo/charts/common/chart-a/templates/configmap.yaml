@@ -1,6 +1,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: chart-a
+  name: {{ include "chart-a.fullname" . }}
+  labels:
+    {{- include "chart-a.labels" . | nindent 4 }}
 data:
   enabled: {{ if .Values.enabled }}"yes"{{ else }}"no"{{ end }}
+  notice: {{ .Files.Get "notice.txt" | quote }}
+  {{- $cfg := .Values.config | fromYaml }}
+  region: {{ $cfg.region | default "local" | quote }}

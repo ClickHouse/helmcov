@@ -1,7 +1,16 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: basic-example
+  name: {{ include "basic-chart.fullname" . }}
+  labels:
+    {{- include "basic-chart.labels" . | nindent 4 }}
 data:
   feature: {{ if .Values.feature.enabled }}"enabled"{{ else }}"disabled"{{ end }}
   message: {{ .Values.message | quote }}
+  greeting: {{ tpl .Values.greeting . | quote }}
+  notice: {{ .Files.Get "notice.txt" | quote }}
+  {{- $settings := .Values.settings | fromYaml }}
+  theme: {{ $settings.theme | default "light" | quote }}
+  {{- if .Capabilities.APIVersions.Has "batch/v1" }}
+  batchSupported: "true"
+  {{- end }}

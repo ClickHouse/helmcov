@@ -1,3 +1,6 @@
 feature:
   enabled: true
 message: hello
+greeting: '{{ include "basic-chart.fullname" . }}'
+settings: |
+  theme: dark

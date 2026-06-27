@@ -1,6 +1,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mode-config
+  name: {{ include "mode-config.fullname" . }}
+  labels:
+    {{- include "mode-config.labels" . | nindent 4 }}
 data:
   mode: {{ if eq .Values.deploymentMode "prod" }}"prod"{{ else }}"dev"{{ end }}
+  policy: {{ tpl (.Values.policy | default "mode={{ .Values.deploymentMode }}") . | quote }}
+  note: {{ .Files.Get "mode.txt" | quote }}
