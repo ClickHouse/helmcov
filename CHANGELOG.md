@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/jordan-simonovski/helmcov/compare/v0.3.2...v0.3.3) (2026-06-27)
+
+
+### Bug Fixes
+
+* resolve coverage calculations ([#14](https://github.com/jordan-simonovski/helmcov/issues/14)) ([045c249](https://github.com/jordan-simonovski/helmcov/commit/045c249e41d828d5947115f7bf73ae98cc1ed814))
+
 ## [0.3.2](https://github.com/jordan-simonovski/helmcov/compare/v0.3.1...v0.3.2) (2026-06-27)
 
 

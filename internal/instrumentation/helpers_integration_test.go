@@ -83,7 +83,7 @@ func TestRenderAndTraceDoesNotRegisterUnrelatedTemplateLines(t *testing.T) {
 
 	exec := NewExecutor()
 	shared := map[string]string{
-		"notes.txt":  "This chart was installed.\n",
+		"notes.txt":   "This chart was installed.\n",
 		"helpers.tpl": `{{- define "demo.name" -}}demo{{- end -}}`,
 	}
 	main := `name: {{ include "demo.name" . }}`
