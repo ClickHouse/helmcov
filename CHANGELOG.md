@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/jordan-simonovski/helmcov/compare/v0.4.0...v0.4.1) (2026-06-27)
+
+
+### Bug Fixes
+
+* **ci:** default action binary to v0.4.0 for markdown support ([#18](https://github.com/jordan-simonovski/helmcov/issues/18)) ([a1919d0](https://github.com/jordan-simonovski/helmcov/commit/a1919d06f4d7cf69b94e9c30d639bed33d8804b9))
+
 ## [0.4.0](https://github.com/jordan-simonovski/helmcov/compare/v0.3.3...v0.4.0) (2026-06-27)
 
 
