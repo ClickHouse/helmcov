@@ -46,9 +46,7 @@ func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[st
 		return trace, "", fmt.Errorf("template %s not found after parse", templateName)
 	}
 
-	for path, content := range sources {
-		registerTemplateLines(path, content, trace.Lines)
-	}
+	registerTemplateLines(templateName, tpl, trace.Lines)
 
 	var rendered bytes.Buffer
 	if err := parsed.Execute(&rendered, values); err != nil {
@@ -94,13 +92,14 @@ func traceDefinedTemplates(parsed *template.Template, sources map[string]string,
 		if sourcePath == "" {
 			continue
 		}
+		registerTemplateLines(sourcePath, sourceContent, trace.Lines)
 		walkTree(tmpl.Root, sourcePath, parsed, values, sourceContent, trace)
 	}
 }
 
 func findDefineSource(defineName string, sources map[string]string) (string, string) {
 	for path, content := range sources {
-		scanned, err := template.New("scan").Parse(content)
+		scanned, err := template.New("scan").Funcs(baseHelmFuncMap()).Option("missingkey=zero").Parse(content)
 		if err != nil {
 			continue
 		}
@@ -114,8 +113,19 @@ func findDefineSource(defineName string, sources map[string]string) (string, str
 }
 
 func registerTemplateLines(templateName string, tpl string, lines map[string]int) {
+	inComment := false
 	for index, line := range strings.Split(tpl, "\n") {
-		if strings.TrimSpace(line) == "" {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if !inComment && strings.Contains(trimmed, "{{/*") {
+			inComment = true
+		}
+		if inComment {
+			if strings.Contains(trimmed, "*/}}") {
+				inComment = false
+			}
 			continue
 		}
 		key := fmt.Sprintf("%s:%d", templateName, index+1)
