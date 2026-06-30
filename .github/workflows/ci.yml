@@ -46,3 +46,26 @@ jobs:
           echo "Got: $title" >&2
           echo "Example: feat(ci): use make ci in workflow" >&2
           exit 1
+
+  coverage-badge:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Update coverage badge
+        run: ./scripts/coverage.sh --update-readme
+      - name: Commit badge if changed
+        run: |
+          if ! git diff --quiet README.md; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add README.md
+            git commit -m "chore: update coverage badge [skip ci]"
+            git push
+          fi
