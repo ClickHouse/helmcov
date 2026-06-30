@@ -1,5 +1,8 @@
 # helmcov
 
+[![Release](https://img.shields.io/github/v/release/jordan-simonovski/helmcov)](https://github.com/jordan-simonovski/helmcov/releases)
+[![Coverage](https://img.shields.io/badge/coverage-73.8%25-green)](#development-workflow)
+
 Dynamic Helm template coverage for branch-heavy charts.
 
 `helmcov` executes Helm templates with chart values, helm-unittest suite values,
