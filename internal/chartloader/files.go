@@ -53,7 +53,7 @@ func insideRoot(link, root string) bool {
 		return false
 	}
 	rel, err := filepath.Rel(root, target)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")
+	return err == nil && (rel == "." || filepath.IsLocal(rel))
 }
 
 var utf8BOM = []byte("\xef\xbb\xbf")
