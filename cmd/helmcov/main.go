@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jordan-simonovski/helmcov/internal/cli"
+	"github.com/ClickHouse/helmcov/internal/cli"
 )
 
 func main() {

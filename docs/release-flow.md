@@ -11,7 +11,7 @@ publishing to GHCR, and vendored release artifacts.
    - updates `CHANGELOG.md`
 3. Merge release PR:
    - creates GitHub release + `vX.Y.Z` tag
-4. `release.yml` triggers on `v*` tags:
+4. `release-please.yml` calls `release.yml` with the new tag:
    - runs GoReleaser
    - publishes binaries/archives/checksums
    - publishes Docker image to GHCR
@@ -22,10 +22,8 @@ publishing to GHCR, and vendored release artifacts.
 6. `release.yml` updates the floating `v1` Git tag used by `uses: .../helmcov@v1`.
 7. `vendor-artifacts.yml` remains available as a manual fallback workflow.
 
-> Important: to allow downstream tag-triggered workflows (`release.yml`) after
-> Release Please creates a tag/release, configure repository secret
-> `RELEASE_PLEASE_TOKEN` (PAT). Using only `GITHUB_TOKEN` may suppress those
-> downstream workflow triggers.
+Release Please calls `release.yml` directly because tags it creates with
+`GITHUB_TOKEN` don't trigger tag-push workflows, so no PAT is needed.
 
 ## Files Involved
 
@@ -37,11 +35,10 @@ publishing to GHCR, and vendored release artifacts.
 - `.release-please-manifest.json`
 - `CHANGELOG.md`
 
-## Required Repository Secrets
+## Repository Secrets
 
-- `RELEASE_PLEASE_TOKEN` (recommended): personal access token used by
-  `release-please.yml` so generated tag/release events can trigger downstream
-  workflows reliably.
+- `RELEASE_PLEASE_TOKEN` (optional): used instead of `GITHUB_TOKEN` when set.
+  Not needed for publishing.
 
 ## Commit Convention and Version Bumps
 
@@ -82,12 +79,20 @@ If no releases exist yet:
 2. Run or wait for `release-please.yml`.
 3. Merge the generated release PR.
 
-If you need to force release quickly, create a matching semver tag manually:
+## Rebuilding a Release
+
+To publish binaries for an existing release tag after a failed run, use
+"Re-run failed jobs" on the release-please run, or dispatch `release.yml` with
+the tag. Re-running the whole release-please run skips publishing, because the
+release already exists.
 
 ```bash
-git tag -a v0.1.0 -m "v0.1.0"
-git push origin v0.1.0
+gh workflow run release.yml -f tag=vX.Y.Z
 ```
+
+The build uses the tag's own `.goreleaser.yml`, so this only works for v0.5.1
+and later. Rebuilding a tag older than the latest release also moves `v1` and
+the `latest` image back to it.
 
 ## Manual Vendoring
 

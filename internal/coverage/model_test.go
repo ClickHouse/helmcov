@@ -3,7 +3,7 @@ package coverage
 import (
 	"testing"
 
-	"github.com/jordan-simonovski/helmcov/internal/instrumentation"
+	"github.com/ClickHouse/helmcov/internal/instrumentation"
 )
 
 func TestFromTracesAggregatesHits(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jordan-simonovski/helmcov/internal/coverage"
+	"github.com/ClickHouse/helmcov/internal/coverage"
 )
 
 func TestWriteGoCoverProfile(t *testing.T) {
