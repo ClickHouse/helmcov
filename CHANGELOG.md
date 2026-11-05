@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/ClickHouse/helmcov/compare/v0.6.0...v0.7.0) (2026-11-05)
+
+
+### Features
+
+* **cli:** add --branch-threshold and the branch-threshold action input ([#25](https://github.com/ClickHouse/helmcov/issues/25)) ([c08e712](https://github.com/ClickHouse/helmcov/commit/c08e7123c951e3a0afc31624bcf57d5c4153ff81))
+
+
+### Bug Fixes
+
+* **cli:** stop test renders at fail, keep coverage for expected failures ([#24](https://github.com/ClickHouse/helmcov/issues/24)) ([a2c6683](https://github.com/ClickHouse/helmcov/commit/a2c6683bf5d343f45eef43dea64090a2665d116f))
+
 ## [0.6.0](https://github.com/ClickHouse/helmcov/compare/v0.5.2...v0.6.0) (2026-11-05)
 
 
