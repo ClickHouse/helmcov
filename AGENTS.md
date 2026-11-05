@@ -67,6 +67,15 @@ Keep a pull request to one concern. A bug fix does not also rename packages.
 - `go.mod`'s `go` directive is the minimum supported Go version. Do not raise it
   without a reason, such as a language feature or a security fix.
 
+## Workflows
+
+- Pin every third-party action to a full commit SHA with its version in a
+  comment (`uses: actions/checkout@<sha> # v7.0.1`). Dependabot updates both.
+- Give each workflow `permissions: contents: read` and widen it per job only
+  where the job needs it.
+- Read untrusted event fields (PR titles, branch names) through `env:`, never
+  by interpolating `${{ }}` into a `run:` script.
+
 ## Coverage semantics
 
 Trace keys are part of the output contract. Changing their format changes every

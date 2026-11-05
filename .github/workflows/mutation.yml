@@ -1,0 +1,30 @@
+name: mutation
+
+# Its own workflow because ci.yml cancels superseded runs, and gremlins crashes on
+# that signal, so a cancelled run used to show as a failure.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  GREMLINS_VERSION: v0.6.0
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+      - name: Install gremlins
+        run: go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
+      - name: Run mutation tests
+        run: |
+          PATH="$(go env GOPATH)/bin:$PATH"
+          export PATH
+          make mutation
