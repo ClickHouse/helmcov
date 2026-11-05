@@ -50,9 +50,9 @@ inputs:
     required: false
     default: "42"
   kube-version:
-    description: Kubernetes version passed to Helm .Capabilities context.
+    description: Kubernetes version for .Capabilities when a suite sets none. Empty means helm-unittest's 1.20.0.
     required: false
-    default: 1.28.0
+    default: ""
   markdown-file:
     description: Path for markdown PR comment output written by helmcov.
     required: false

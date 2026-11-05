@@ -13,6 +13,14 @@ estimate:
 - branch coverage for `if`/`else if`, `range`, `with`/`else with`, each
   `and`/`or` operand, and the outcomes of `default`, `ternary` and `coalesce`
 
+Templates render the way helm-unittest renders them: with its default release
+(`RELEASE-NAME` in `NAMESPACE`), Kubernetes 1.20 and no API versions, plus any
+`release`, `capabilities` and `chart` a suite or test sets, and with
+`templates` globs such as `"*.yaml"` expanded. A chart that branches on
+`.Capabilities.APIVersions.Has` needs its suites to list those versions under
+`capabilities.apiVersions`, as helm-unittest itself does. `--kube-version`
+sets the Kubernetes version for suites that do not.
+
 Coverage counts the chart's own templates. Suites may also list a packaged
 dependency's templates (`charts/<subchart>/templates/...`); helmcov skips those.
 
