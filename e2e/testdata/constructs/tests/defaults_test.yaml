@@ -9,3 +9,11 @@ tests:
     asserts:
       - isKind:
           of: ConfigMap
+  - it: renders staging mode from its own set value
+    template: templates/conditionals.yaml
+    set:
+      mode: staging
+    asserts:
+      - equal:
+          path: data.mode
+          value: staging

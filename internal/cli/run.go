@@ -45,41 +45,17 @@ func Run(args []string, stdout io.Writer) error {
 			return filesErr
 		}
 		totalSuites += len(bundle.Suites)
+		chart := chartRenderer{
+			exec: exec, chartPath: target.ChartPath, meta: bundle.Chart, kubeVersion: cfg.KubeVersion,
+			files: chartFiles, templates: chartTemplates, sources: map[string]templateSource{},
+		}
 		for _, suite := range bundle.Suites {
-			scenarios := valuegen.Generate(suite.MergedValues, valuegen.Options{
-				MaxScenarios: cfg.MaxScenarios,
-				Seed:         cfg.Seed,
-			})
-			for _, templatePath := range suite.Templates {
-				templateFile, resolveErr := chartloader.ResolveTemplatePath(target.ChartPath, templatePath)
-				if resolveErr != nil {
-					// A packaged dependency's templates sit inside its .tgz and are not this chart's source.
-					if chartloader.IsPackagedSubchartTemplate(target.ChartPath, templatePath) {
-						continue
-					}
-					return fmt.Errorf("resolve template %s: %w", templatePath, resolveErr)
+			for _, job := range suiteRenders(suite, cfg) {
+				trace, ok, err := chart.trace(job.template, job.values)
+				if err != nil {
+					return err
 				}
-				content, readErr := os.ReadFile(templateFile)
-				if readErr != nil {
-					return fmt.Errorf("read template %s: %w", templateFile, readErr)
-				}
-				for _, scenario := range scenarios {
-					trace, _, traceErr := exec.RenderAndTrace(
-						templateFile,
-						string(content),
-						chartloader.HelmRenderValues(chartloader.RenderOptions{
-							Chart:        bundle.Chart,
-							Values:       scenario,
-							ChartPath:    target.ChartPath,
-							TemplatePath: templateFile,
-							KubeVersion:  cfg.KubeVersion,
-							Files:        chartFiles,
-						}),
-						chartTemplates,
-					)
-					if traceErr != nil {
-						return fmt.Errorf("render template %s: %w", templatePath, traceErr)
-					}
+				if ok {
 					traces = append(traces, trace)
 				}
 			}
@@ -117,6 +93,85 @@ func Run(args []string, stdout io.Writer) error {
 		}
 	}
 	return nil
+}
+
+type renderJob struct {
+	template string
+	values   map[string]any
+}
+
+// suiteRenders renders the suite's templates with its values and the generated
+// scenarios, then each test's templates with that test's own values.
+func suiteRenders(suite chartloader.Suite, cfg Config) []renderJob {
+	scenarios := valuegen.Generate(suite.MergedValues, valuegen.Options{MaxScenarios: cfg.MaxScenarios, Seed: cfg.Seed})
+	var jobs []renderJob
+	for _, template := range suite.Templates {
+		for _, values := range scenarios {
+			jobs = append(jobs, renderJob{template: template, values: values})
+		}
+	}
+	for _, test := range suite.Tests {
+		for _, template := range test.TemplatesIn(suite) {
+			jobs = append(jobs, renderJob{template: template, values: test.MergedValues})
+		}
+	}
+	return jobs
+}
+
+type templateSource struct {
+	file, content string
+	skip          bool
+}
+
+type chartRenderer struct {
+	exec        *instrumentation.Executor
+	chartPath   string
+	meta        chartloader.ChartMeta
+	kubeVersion string
+	files       chartloader.ChartFiles
+	templates   map[string]string
+	sources     map[string]templateSource
+}
+
+// trace renders one template with values. ok is false for templates helmcov skips.
+func (c chartRenderer) trace(templatePath string, values map[string]any) (instrumentation.Trace, bool, error) {
+	src, err := c.source(templatePath)
+	if err != nil || src.skip {
+		return instrumentation.Trace{}, false, err
+	}
+	trace, _, err := c.exec.RenderAndTrace(src.file, src.content, chartloader.HelmRenderValues(chartloader.RenderOptions{
+		Chart:        c.meta,
+		Values:       values,
+		ChartPath:    c.chartPath,
+		TemplatePath: src.file,
+		KubeVersion:  c.kubeVersion,
+		Files:        c.files,
+	}), c.templates)
+	if err != nil {
+		return instrumentation.Trace{}, false, fmt.Errorf("render template %s: %w", templatePath, err)
+	}
+	return trace, true, nil
+}
+
+func (c chartRenderer) source(templatePath string) (templateSource, error) {
+	if src, ok := c.sources[templatePath]; ok {
+		return src, nil
+	}
+	file, err := chartloader.ResolveTemplatePath(c.chartPath, templatePath)
+	if err != nil {
+		// A packaged dependency's templates sit inside its .tgz and are not this chart's source.
+		if chartloader.IsPackagedSubchartTemplate(c.chartPath, templatePath) {
+			c.sources[templatePath] = templateSource{skip: true}
+			return c.sources[templatePath], nil
+		}
+		return templateSource{}, fmt.Errorf("resolve template %s: %w", templatePath, err)
+	}
+	content, err := os.ReadFile(file)
+	if err != nil {
+		return templateSource{}, fmt.Errorf("read template %s: %w", file, err)
+	}
+	c.sources[templatePath] = templateSource{file: file, content: string(content)}
+	return c.sources[templatePath], nil
 }
 
 type target struct {

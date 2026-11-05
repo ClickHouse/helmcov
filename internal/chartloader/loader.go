@@ -4,9 +4,13 @@ package chartloader
 import (
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -28,8 +32,32 @@ type Suite struct {
 	Templates    []string       `yaml:"templates"`
 	ValuesFiles  []string       `yaml:"values"`
 	Set          map[string]any `yaml:"set"`
+	Tests        []Test         `yaml:"tests"`
+	Skip         map[string]any `yaml:"skip"`
 	Path         string
 	MergedValues map[string]any
+}
+
+// Test is one helm-unittest test case. Its values and set layer on top of the suite's.
+type Test struct {
+	Name         string         `yaml:"it"`
+	Template     string         `yaml:"template"`
+	Templates    []string       `yaml:"templates"`
+	ValuesFiles  []string       `yaml:"values"`
+	Set          map[string]any `yaml:"set"`
+	Skip         map[string]any `yaml:"skip"`
+	MergedValues map[string]any `yaml:"-"`
+}
+
+// TemplatesIn returns the templates the test renders: its own selection, or the suite's.
+func (t Test) TemplatesIn(suite Suite) []string {
+	if t.Template != "" {
+		return []string{t.Template}
+	}
+	if len(t.Templates) > 0 {
+		return t.Templates
+	}
+	return suite.Templates
 }
 
 func DiscoverCharts(root string) ([]string, error) {
@@ -114,28 +142,88 @@ func LoadBundle(chartPath, testsPath string) (Bundle, error) {
 		if unmarshalErr := yaml.Unmarshal(suiteBytes, &suite); unmarshalErr != nil {
 			return Bundle{}, fmt.Errorf("parse suite %s: %w", suitePath, unmarshalErr)
 		}
+		// helm-unittest never runs skipped suites or tests, so their files need not exist.
+		if suite.Skip != nil {
+			continue
+		}
 		suite.Path = suitePath
-		suite.MergedValues = deepCopyMap(chartValues)
-
-		for _, valueFile := range suite.ValuesFiles {
-			abs := valueFile
-			if !filepath.IsAbs(abs) {
-				abs = filepath.Join(filepath.Dir(suitePath), valueFile)
-			}
-			valueMap, valueErr := loadYAMLMap(abs)
-			if valueErr != nil {
-				return Bundle{}, fmt.Errorf("load suite values %s: %w", abs, valueErr)
-			}
-			mergeInto(suite.MergedValues, valueMap)
+		suiteDir := filepath.Dir(suitePath)
+		if suite.MergedValues, err = layerValues(chartValues, suiteDir, suite.ValuesFiles, suite.Set); err != nil {
+			return Bundle{}, fmt.Errorf("load suite values %w", err)
 		}
-		for key, value := range suite.Set {
-			setByPath(suite.MergedValues, key, value)
+		tests := suite.Tests[:0]
+		for _, test := range suite.Tests {
+			if test.Skip != nil {
+				continue
+			}
+			// As in helm-unittest: every values file first, then the suite's set, then the test's.
+			files := append(slices.Clone(suite.ValuesFiles), test.ValuesFiles...)
+			if test.MergedValues, err = layerValues(chartValues, suiteDir, files, suite.Set, test.Set); err != nil {
+				return Bundle{}, fmt.Errorf("load values for test %q: %w", test.Name, err)
+			}
+			tests = append(tests, test)
 		}
+		suite.Tests = tests
 
 		bundle.Suites = append(bundle.Suites, suite)
 	}
 
 	return bundle, nil
+}
+
+// layerValues copies base, merges each values file (relative to dir, as helm-unittest
+// resolves them), then each set in order, with its paths in key order.
+func layerValues(base map[string]any, dir string, files []string, sets ...map[string]any) (map[string]any, error) {
+	merged := deepCopyMap(base)
+	for _, file := range files {
+		if !filepath.IsAbs(file) {
+			file = filepath.Join(dir, file)
+		}
+		values, err := loadYAMLMap(file)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", file, err)
+		}
+		mergeInto(merged, values)
+	}
+	for _, set := range sets {
+		for _, key := range slices.Sorted(maps.Keys(set)) {
+			mergeInto(merged, setPathValue(key, set[key]))
+		}
+	}
+	return merged, nil
+}
+
+// setPathValue turns a set path such as "a.list[1].b" into the nested value it
+// describes, so merging it behaves like Helm's --set: maps merge, a list index
+// replaces the whole list, and null deletes the key.
+func setPathValue(path string, value any) map[string]any {
+	parts := strings.Split(path, ".")
+	for i := len(parts) - 1; i >= 0; i-- {
+		name, indexes := splitIndexes(parts[i])
+		for j := len(indexes) - 1; j >= 0; j-- {
+			list := make([]any, indexes[j]+1)
+			list[indexes[j]] = value
+			value = list
+		}
+		value = map[string]any{name: value}
+	}
+	return value.(map[string]any)
+}
+
+var indexSuffix = regexp.MustCompile(`\[(\d+)\]$`)
+
+// splitIndexes splits "list[1][0]" into "list" and [1, 0].
+func splitIndexes(part string) (string, []int) {
+	var indexes []int
+	for {
+		match := indexSuffix.FindStringSubmatchIndex(part)
+		if match == nil {
+			return part, indexes
+		}
+		index, _ := strconv.Atoi(part[match[2]:match[3]])
+		indexes = append([]int{index}, indexes...)
+		part = part[:match[0]]
+	}
 }
 
 func loadYAMLMap(path string) (map[string]any, error) {
@@ -161,6 +249,8 @@ func mergeInto(dst map[string]any, src map[string]any) {
 		srcMap, srcIsMap := asStringMap(value)
 		dstMap, dstIsMap := asStringMap(dst[key])
 		switch {
+		case value == nil:
+			delete(dst, key) // Helm treats null as "remove this key"
 		case srcIsMap && dstIsMap:
 			mergeInto(dstMap, srcMap)
 			dst[key] = dstMap
@@ -169,32 +259,6 @@ func mergeInto(dst map[string]any, src map[string]any) {
 		default:
 			dst[key] = value
 		}
-	}
-}
-
-func setByPath(dst map[string]any, path string, value any) {
-	parts := strings.Split(path, ".")
-	current := dst
-	for idx, part := range parts {
-		if idx == len(parts)-1 {
-			current[part] = value
-			return
-		}
-
-		next, ok := current[part]
-		if !ok {
-			newMap := map[string]any{}
-			current[part] = newMap
-			current = newMap
-			continue
-		}
-		nextMap, nextMapOK := asStringMap(next)
-		if !nextMapOK {
-			nextMap = map[string]any{}
-		}
-		// asStringMap may return a converted copy, so store what we write into.
-		current[part] = nextMap
-		current = nextMap
 	}
 }
 
