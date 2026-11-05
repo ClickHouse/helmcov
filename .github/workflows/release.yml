@@ -1,13 +1,25 @@
 name: release
 
+# Called by release-please: tags it creates with GITHUB_TOKEN don't trigger tag-push workflows.
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build (example: v0.5.0)"
+        required: true
+        type: string
 
 permissions:
   contents: write
   packages: write
+
+env:
+  TAG: ${{ inputs.tag }}
 
 jobs:
   goreleaser:
@@ -15,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.TAG }}
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
@@ -33,10 +46,12 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Stops goreleaser picking v1 when it points at the same commit.
+          GORELEASER_CURRENT_TAG: ${{ env.TAG }}
       - name: Upload GoReleaser dist artifact
         uses: actions/upload-artifact@v4
         with:
-          name: goreleaser-dist-${{ github.ref_name }}
+          name: goreleaser-dist-${{ env.TAG }}
           path: dist
           if-no-files-found: error
 
@@ -47,11 +62,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
       - name: Update v1 action tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f v1 "${GITHUB_SHA}"
+          git tag -f v1 HEAD
           git push origin v1 --force
 
   vendor-artifacts:
@@ -63,11 +80,11 @@ jobs:
     steps:
       - name: Resolve version from tag
         id: version
-        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "value=${TAG#v}" >> "$GITHUB_OUTPUT"
       - name: Download GoReleaser dist artifact
         uses: actions/download-artifact@v4
         with:
-          name: goreleaser-dist-${{ github.ref_name }}
+          name: goreleaser-dist-${{ env.TAG }}
           path: dist
       - name: Validate dist contents
         run: |
@@ -78,8 +95,8 @@ jobs:
       - name: Record image references
         run: |
           {
-            echo "ghcr.io/${{ github.repository_owner }}/helmcov:v${{ steps.version.outputs.value }}"
-            echo "ghcr.io/${{ github.repository_owner }}/helmcov:latest"
+            echo "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/helmcov:v${{ steps.version.outputs.value }}"
+            echo "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/helmcov:latest"
           } > dist/image-refs.txt
       - name: Upload vendored artifacts
         uses: actions/upload-artifact@v4

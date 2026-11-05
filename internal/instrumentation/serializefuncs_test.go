@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jordan-simonovski/helmcov/internal/chartloader"
+	"github.com/ClickHouse/helmcov/internal/chartloader"
 )
 
 func TestFromYAMLReturnsMapOrErrorKey(t *testing.T) {

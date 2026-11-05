@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/jordan-simonovski/helmcov/internal/coverage"
+	"github.com/ClickHouse/helmcov/internal/coverage"
 )
 
 func WriteGoCoverProfile(report coverage.Report, writer io.Writer) error {
