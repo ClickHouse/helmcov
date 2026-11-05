@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -51,7 +52,7 @@ func Run(args []string, stdout io.Writer) error {
 		}
 		for _, suite := range bundle.Suites {
 			for _, job := range suiteRenders(suite, cfg) {
-				trace, ok, err := chart.trace(job.template, job.values)
+				trace, ok, err := chart.trace(job)
 				if err != nil {
 					return err
 				}
@@ -95,9 +96,13 @@ func Run(args []string, stdout io.Writer) error {
 	return nil
 }
 
+// helmUnittestKubeVersion is the Kubernetes version helm-unittest renders with by default.
+const helmUnittestKubeVersion = "1.20.0"
+
 type renderJob struct {
 	template string
 	values   map[string]any
+	context  chartloader.UnittestContext
 }
 
 // suiteRenders renders the suite's templates with its values and the generated
@@ -107,12 +112,12 @@ func suiteRenders(suite chartloader.Suite, cfg Config) []renderJob {
 	var jobs []renderJob
 	for _, template := range suite.Templates {
 		for _, values := range scenarios {
-			jobs = append(jobs, renderJob{template: template, values: values})
+			jobs = append(jobs, renderJob{template: template, values: values, context: suite.Context()})
 		}
 	}
 	for _, test := range suite.Tests {
 		for _, template := range test.TemplatesIn(suite) {
-			jobs = append(jobs, renderJob{template: template, values: test.MergedValues})
+			jobs = append(jobs, renderJob{template: template, values: test.MergedValues, context: test.ContextIn(suite)})
 		}
 	}
 	return jobs
@@ -133,19 +138,25 @@ type chartRenderer struct {
 	sources     map[string]templateSource
 }
 
-// trace renders one template with values. ok is false for templates helmcov skips.
-func (c chartRenderer) trace(templatePath string, values map[string]any) (instrumentation.Trace, bool, error) {
+// trace renders one job. ok is false for templates helmcov skips.
+func (c chartRenderer) trace(job renderJob) (instrumentation.Trace, bool, error) {
+	templatePath := job.template
 	src, err := c.source(templatePath)
 	if err != nil || src.skip {
 		return instrumentation.Trace{}, false, err
 	}
+	meta := c.meta
+	meta.Version = cmp.Or(job.context.ChartVersion, meta.Version)
+	meta.AppVersion = cmp.Or(job.context.ChartAppVersion, meta.AppVersion)
 	trace, _, err := c.exec.RenderAndTrace(src.file, src.content, chartloader.HelmRenderValues(chartloader.RenderOptions{
-		Chart:        c.meta,
-		Values:       values,
+		Chart:        meta,
+		Values:       job.values,
 		ChartPath:    c.chartPath,
 		TemplatePath: src.file,
-		KubeVersion:  c.kubeVersion,
+		KubeVersion:  cmp.Or(job.context.KubeVersion, c.kubeVersion, helmUnittestKubeVersion),
 		Files:        c.files,
+		Release:      job.context.Release,
+		APIVersions:  job.context.APIVersions,
 	}), c.templates)
 	if err != nil {
 		return instrumentation.Trace{}, false, fmt.Errorf("render template %s: %w", templatePath, err)

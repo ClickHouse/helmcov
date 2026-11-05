@@ -49,7 +49,7 @@ func ParseConfig(args []string) (Config, error) {
 	fs.StringVar(&cfg.CommentMarker, "comment-marker", "helmcov-comment", "HTML comment marker for markdown PR output")
 	fs.BoolVar(&cfg.MarkdownFileSummary, "markdown-file-summary", false, "include per-file summary table in markdown output")
 	fs.BoolVar(&cfg.MarkdownIncludeTpl, "markdown-include-tpl", false, "include tpl(...) inline template sources in markdown output")
-	fs.StringVar(&cfg.KubeVersion, "kube-version", "1.28.0", "Kubernetes version for .Capabilities context")
+	fs.StringVar(&cfg.KubeVersion, "kube-version", "", "Kubernetes version for .Capabilities when a suite sets none (default helm-unittest's 1.20.0)")
 	fs.BoolVar(&cfg.Verbose, "verbose", false, "print per-file and uncovered coverage details")
 
 	if err := fs.Parse(args); err != nil {

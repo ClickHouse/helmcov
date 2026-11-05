@@ -37,6 +37,9 @@ type Suite struct {
 	Set          map[string]any `yaml:"set"`
 	Tests        []Test         `yaml:"tests"`
 	Skip         map[string]any `yaml:"skip"`
+	Release      releaseSpec    `yaml:"release"`
+	Capabilities capabilities   `yaml:"capabilities"`
+	ChartMeta    chartOverride  `yaml:"chart"`
 	Path         string
 	MergedValues map[string]any
 }
@@ -49,14 +52,14 @@ type Test struct {
 	ValuesFiles  []string       `yaml:"values"`
 	Set          map[string]any `yaml:"set"`
 	Skip         map[string]any `yaml:"skip"`
+	Release      releaseSpec    `yaml:"release"`
+	Capabilities capabilities   `yaml:"capabilities"`
+	ChartMeta    chartOverride  `yaml:"chart"`
 	MergedValues map[string]any `yaml:"-"`
 }
 
 // TemplatesIn returns the templates the test renders: its own selection, or the suite's.
 func (t Test) TemplatesIn(suite Suite) []string {
-	if t.Template != "" {
-		return []string{t.Template}
-	}
 	if len(t.Templates) > 0 {
 		return t.Templates
 	}
@@ -152,6 +155,9 @@ func LoadBundle(chartPath, testsPath string) (Bundle, error) {
 		}
 		suite.Path = suitePath
 		suiteDir := filepath.Dir(suitePath)
+		if suite.Templates, err = expandTemplates(chartPath, suite.Templates); err != nil {
+			return Bundle{}, fmt.Errorf("suite %s: %w", suitePath, err)
+		}
 		if suite.MergedValues, err = layerValues(chartValues, suiteDir, suite.ValuesFiles, suite.Set); err != nil {
 			return Bundle{}, fmt.Errorf("load suite values %w", err)
 		}
@@ -164,6 +170,13 @@ func LoadBundle(chartPath, testsPath string) (Bundle, error) {
 			files := append(slices.Clone(suite.ValuesFiles), test.ValuesFiles...)
 			if test.MergedValues, err = layerValues(chartValues, suiteDir, files, suite.Set, test.Set); err != nil {
 				return Bundle{}, fmt.Errorf("load values for test %q: %w", test.Name, err)
+			}
+			if test.Template != "" {
+				test.Templates = append([]string{test.Template}, test.Templates...)
+				test.Template = ""
+			}
+			if test.Templates, err = expandTemplates(chartPath, test.Templates); err != nil {
+				return Bundle{}, fmt.Errorf("test %q: %w", test.Name, err)
 			}
 			tests = append(tests, test)
 		}

@@ -1,6 +1,8 @@
 package chartloader
 
-import "path/filepath"
+import (
+	"path/filepath"
+)
 
 type RenderOptions struct {
 	Chart        ChartMeta
@@ -9,6 +11,9 @@ type RenderOptions struct {
 	TemplatePath string
 	KubeVersion  string
 	Files        ChartFiles
+	// Release and APIVersions override helm template's defaults when set.
+	Release     map[string]any
+	APIVersions APIVersionSet
 }
 
 func HelmRenderValues(opts RenderOptions) map[string]any {
@@ -20,11 +25,15 @@ func HelmRenderValues(opts RenderOptions) map[string]any {
 		chartValues["AppVersion"] = opts.Chart.AppVersion
 	}
 
+	release := opts.Release
+	if release == nil {
+		release = defaultReleaseValues()
+	}
 	return map[string]any{
 		"Values":       opts.Values,
 		"Chart":        chartValues,
-		"Release":      defaultReleaseValues(),
-		"Capabilities": BuildCapabilities(opts.KubeVersion),
+		"Release":      release,
+		"Capabilities": BuildCapabilities(opts.KubeVersion, opts.APIVersions),
 		"Files":        opts.Files,
 		"Template":     templateContext(opts.ChartPath, opts.TemplatePath),
 	}

@@ -5,7 +5,7 @@ import "testing"
 func TestBuildCapabilitiesDefaultsKubeVersion(t *testing.T) {
 	t.Parallel()
 
-	caps := BuildCapabilities("")
+	caps := BuildCapabilities("", nil)
 	kube := caps["KubeVersion"].(map[string]any)
 	if kube["GitVersion"] != "v1.28.0" {
 		t.Fatalf("expected default git version, got %#v", kube["GitVersion"])
@@ -18,7 +18,7 @@ func TestBuildCapabilitiesDefaultsKubeVersion(t *testing.T) {
 func TestBuildCapabilitiesNormalizesVersion(t *testing.T) {
 	t.Parallel()
 
-	caps := BuildCapabilities("1.30.2")
+	caps := BuildCapabilities("1.30.2", nil)
 	kube := caps["KubeVersion"].(map[string]any)
 	if kube["Version"] != "v1.30.2" {
 		t.Fatalf("expected normalized version, got %#v", kube["Version"])
