@@ -17,9 +17,17 @@ import (
 	"github.com/ClickHouse/helmcov/internal/valuegen"
 )
 
+// Version is the helmcov version. main sets it once at startup from build
+// metadata, the one package variable the no-mutable-state rule allows.
+var Version = "dev"
+
 func Run(args []string, stdout io.Writer) error {
 	cfg, err := ParseConfig(args)
 	if err != nil {
+		return err
+	}
+	if cfg.ShowVersion {
+		_, err := fmt.Fprintf(stdout, "helmcov %s\n", Version)
 		return err
 	}
 

@@ -1,0 +1,33 @@
+name: Bug report
+description: helmcov reports the wrong coverage, renders differently from Helm, or fails
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: helmcov version
+      description: Output of `helmcov --version`, or the release tag or action version you use.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or workflow step
+      description: The exact command, or the `uses:` step with its inputs.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected and what happened
+      description: For coverage bugs, the trace key you expected (for example `templates/x.yaml:12:if:true`) and what helmcov reported.
+    validations:
+      required: true
+  - type: textarea
+    id: chart
+    attributes:
+      label: Smallest chart that reproduces it
+      description: The template, values and helm-unittest suite, or a link to a repository.
+    validations:
+      required: true

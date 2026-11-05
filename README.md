@@ -102,6 +102,7 @@ Mode rules:
   - default: `42`
 - `--verbose`: print CI-friendly per-file details, including uncovered lines and branch edges
   - includes exact uncovered line refs as `path:line("source")`
+- `--version`: print the helmcov version and exit
 
 ## Example commands
 
