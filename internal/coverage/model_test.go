@@ -111,3 +111,19 @@ func TestFileBranchRate(t *testing.T) {
 		t.Fatalf("expected 0 for missing file, got %v", got)
 	}
 }
+
+func TestReportRatesLeaveOutTplSources(t *testing.T) {
+	t.Parallel()
+
+	report := Report{Files: map[string]FileCoverage{
+		"templates/cm.yaml": {Lines: map[int]int{1: 1, 2: 0}, Branches: map[string]int{"1:if:true": 1, "1:if:false": 0}},
+		"tpl:abc123":        {Lines: map[int]int{1: 1, 2: 1, 3: 1}, Branches: map[string]int{"1:if:true": 1, "1:if:false": 1}},
+	}}
+
+	if got := report.LineRate(); got != 0.5 {
+		t.Errorf("LineRate() = %v, want 0.5", got)
+	}
+	if got := report.BranchRate(); got != 0.5 {
+		t.Errorf("BranchRate() = %v, want 0.5", got)
+	}
+}
