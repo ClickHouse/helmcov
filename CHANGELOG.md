@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.6.0](https://github.com/ClickHouse/helmcov/compare/v0.5.2...v0.6.0) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chartloader:** suites and tests now render with helm-unittest's defaults (RELEASE-NAME, NAMESPACE, Kubernetes 1.20, no API versions) instead of helm template's. Charts that branch on .Capabilities.APIVersions.Has must list those versions under capabilities.apiVersions. --kube-version and the action's kube-version input now default to empty, meaning 1.20.
+* **instrumentation:** branches written as `else if` / `else with` now report as `else-if` / `else-with`, and the new and/or, default, ternary and coalesce branches lower branch coverage for most charts. Line coverage and --threshold are unchanged.
+
+### Features
+
+* **chartloader:** answer lookup from helm-unittest's kubernetesProvider ([#23](https://github.com/ClickHouse/helmcov/issues/23)) ([675e1e0](https://github.com/ClickHouse/helmcov/commit/675e1e00634fbea5d61755220b8f508f3f5d5f36))
+* **chartloader:** render each helm-unittest test with its own values ([#15](https://github.com/ClickHouse/helmcov/issues/15)) ([5e208cb](https://github.com/ClickHouse/helmcov/commit/5e208cb2df01723aa365659f069e26e9227a6910))
+* **chartloader:** render suites with helm-unittest's context and template globs ([#21](https://github.com/ClickHouse/helmcov/issues/21)) ([74748f5](https://github.com/ClickHouse/helmcov/commit/74748f53b1fc40ecbab93e2b2af932f0efbb3d37))
+* **cli:** add --version and issue templates ([#20](https://github.com/ClickHouse/helmcov/issues/20)) ([8b343f8](https://github.com/ClickHouse/helmcov/commit/8b343f8017e368b09fb16eb6883494d91c6accfc))
+* **instrumentation:** trace and/or operands, default, ternary, coalesce and else chains ([#16](https://github.com/ClickHouse/helmcov/issues/16)) ([e6b7c84](https://github.com/ClickHouse/helmcov/commit/e6b7c84b99f4f58b04dbb2efb092ce08d90b7de2))
+
+
+### Bug Fixes
+
+* **action:** verify release downloads, pin actions by SHA, attest releases ([#18](https://github.com/ClickHouse/helmcov/issues/18)) ([c1b6480](https://github.com/ClickHouse/helmcov/commit/c1b64805fe3719a6e3cb1889eb6849ccb7334575))
+* **chartloader:** keep values under non-string YAML keys, raise coverage gate to 85% ([#14](https://github.com/ClickHouse/helmcov/issues/14)) ([48faf7c](https://github.com/ClickHouse/helmcov/commit/48faf7cc9ff31dd97784dea9122cc19424d8f841))
+* **chartloader:** match Helm's .Files, .helmignore and YAML handling ([#17](https://github.com/ClickHouse/helmcov/issues/17)) ([c0c17c8](https://github.com/ClickHouse/helmcov/commit/c0c17c86d1a2ebadb93a4b01718c5d0272429b88))
+* **instrumentation:** match Helm's tpl and quote output, add e2e tests ([#12](https://github.com/ClickHouse/helmcov/issues/12)) ([22093ea](https://github.com/ClickHouse/helmcov/commit/22093ea4bf6235eeb1d6e0505f75ba2b3b4245c8))
+
 ## [0.5.2](https://github.com/ClickHouse/helmcov/compare/v0.5.1...v0.5.2) (2026-11-05)
 
 
