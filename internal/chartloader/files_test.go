@@ -25,6 +25,14 @@ func TestLoadChartFilesMatchesHelm(t *testing.T) {
 	if err := os.Symlink(filepath.Join(chart, "files"), filepath.Join(chart, "linked")); err != nil {
 		t.Fatal(err)
 	}
+	outside := t.TempDir()
+	writeFile(t, filepath.Join(outside, "credentials"), "secret")
+	if err := os.Symlink(outside, filepath.Join(chart, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "credentials"), filepath.Join(chart, "escape.txt")); err != nil {
+		t.Fatal(err)
+	}
 
 	files, err := LoadChartFiles(chart)
 	if err != nil {

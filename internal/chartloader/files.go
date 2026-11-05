@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -36,16 +37,29 @@ func LoadChartFiles(chartPath string) (ChartFiles, error) {
 	if ignore.ignores("Chart.yaml", false) {
 		return nil, errors.New(".helmignore excludes Chart.yaml, so Helm cannot load this chart")
 	}
+	root, err := filepath.EvalSymlinks(chartPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve chart path: %w", err)
+	}
 	files := ChartFiles{}
-	if err := files.load(chartPath, "", ignore, map[string]bool{}); err != nil {
+	if err := files.load(chartPath, "", root, ignore, map[string]bool{}); err != nil {
 		return nil, fmt.Errorf("load chart files: %w", err)
 	}
 	return files, nil
 }
 
+func insideRoot(link, root string) bool {
+	target, err := filepath.EvalSymlinks(link)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(root, target)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")
+}
+
 var utf8BOM = []byte("\xef\xbb\xbf")
 
-func (f ChartFiles) load(dir, prefix string, ignore helmignore, seen map[string]bool) error {
+func (f ChartFiles) load(dir, prefix, root string, ignore helmignore, seen map[string]bool) error {
 	resolved, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return err
@@ -63,6 +77,11 @@ func (f ChartFiles) load(dir, prefix string, ignore helmignore, seen map[string]
 	for _, entry := range entries {
 		full := filepath.Join(dir, entry.Name())
 		rel := path.Join(prefix, entry.Name())
+		// Helm follows links anywhere; helmcov skips ones that leave the chart, so a chart
+		// from an untrusted PR cannot read runner files such as credentials into .Files.
+		if !insideRoot(full, root) {
+			continue
+		}
 		info, err := os.Stat(full) // follows symlinks, as Helm does
 		if err != nil {
 			return err
@@ -71,7 +90,7 @@ func (f ChartFiles) load(dir, prefix string, ignore helmignore, seen map[string]
 			if rel == "templates" || rel == "charts" || ignore.ignores(rel, true) {
 				continue
 			}
-			if err := f.load(full, rel, ignore, seen); err != nil {
+			if err := f.load(full, rel, root, ignore, seen); err != nil {
 				return err
 			}
 			continue
