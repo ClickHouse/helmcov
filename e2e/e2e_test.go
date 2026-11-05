@@ -78,13 +78,21 @@ func TestRenderMatchesHelmTemplate(t *testing.T) {
 		t.Skip("helm not on PATH")
 	}
 
-	chart := "testdata/constructs"
-	helmDocs := helmTemplate(t, chart)
+	for _, chart := range []string{"testdata/constructs", "testdata/parity"} {
+		t.Run(filepath.Base(chart), func(t *testing.T) {
+			t.Parallel()
+			assertRendersLikeHelm(t, chart)
+		})
+	}
+}
 
+func assertRendersLikeHelm(t *testing.T, chart string) {
+	t.Helper()
 	bundle, err := chartloader.LoadBundle(chart, filepath.Join(chart, "tests"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	helmDocs := helmTemplate(t, chart, bundle.Chart.Name)
 	shared, err := chartloader.LoadTemplateFiles(chart)
 	if err != nil {
 		t.Fatal(err)
@@ -93,23 +101,13 @@ func TestRenderMatchesHelmTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The defaults suite sets nothing, so its values are the chart's values.yaml, as helm template uses.
-	var values map[string]any
-	for _, suite := range bundle.Suites {
-		if suite.Name == "defaults" {
-			values = suite.MergedValues
-		}
-	}
-	if values == nil {
-		t.Fatal("defaults suite not found")
-	}
 
 	templates, err := filepath.Glob(filepath.Join(chart, "templates", "[^_]*.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(helmDocs) != len(templates) {
-		t.Fatalf("helm rendered %d documents for %d templates; every template must render so it is compared", len(helmDocs), len(templates))
+		t.Fatalf("helm rendered %d documents for %d templates; every template must render exactly one document so it is compared", len(helmDocs), len(templates))
 	}
 
 	for name, want := range helmDocs {
@@ -121,7 +119,7 @@ func TestRenderMatchesHelmTemplate(t *testing.T) {
 		_, got, err := instrumentation.NewExecutor().RenderAndTrace(path, string(content),
 			chartloader.HelmRenderValues(chartloader.RenderOptions{
 				Chart:        bundle.Chart,
-				Values:       values,
+				Values:       bundle.Values,
 				ChartPath:    chart,
 				TemplatePath: path,
 				KubeVersion:  "1.28.0",
@@ -137,7 +135,7 @@ func TestRenderMatchesHelmTemplate(t *testing.T) {
 }
 
 // helmTemplate returns each rendered document keyed by its template file name.
-func helmTemplate(t *testing.T, chart string) map[string]string {
+func helmTemplate(t *testing.T, chart, name string) map[string]string {
 	t.Helper()
 	out, err := exec.Command("helm", "template", "release-name", chart, "--kube-version", "1.28.0").Output()
 	if err != nil {
@@ -150,8 +148,11 @@ func helmTemplate(t *testing.T, chart string) map[string]string {
 		if !ok || !strings.HasPrefix(header, "# Source: ") {
 			continue
 		}
-		name := strings.TrimPrefix(header, "# Source: constructs/templates/")
-		docs[name] = strings.TrimSpace(body)
+		file := strings.TrimPrefix(header, "# Source: "+name+"/templates/")
+		if _, dup := docs[file]; dup {
+			t.Fatalf("%s rendered more than one document; Helm reorders those, so split it", file)
+		}
+		docs[file] = strings.TrimSpace(body)
 	}
 	if len(docs) == 0 {
 		t.Fatalf("no documents in helm output:\n%s", out)

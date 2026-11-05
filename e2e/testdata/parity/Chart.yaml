@@ -1,0 +1,4 @@
+apiVersion: v2
+name: parity
+description: Exercises Helm built-ins whose output helmcov must reproduce exactly.
+version: 0.1.0

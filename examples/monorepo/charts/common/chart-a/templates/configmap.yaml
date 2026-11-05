@@ -6,6 +6,6 @@ metadata:
     {{- include "chart-a.labels" . | nindent 4 }}
 data:
   enabled: {{ if .Values.enabled }}"yes"{{ else }}"no"{{ end }}
-  notice: {{ .Files.Get "notice.txt" | quote }}
+  notice: {{ .Files.Get "files/notice.txt" | trim | quote }}
   {{- $cfg := .Values.config | fromYaml }}
   region: {{ $cfg.region | default "local" | quote }}
