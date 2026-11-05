@@ -15,6 +15,7 @@ type Config struct {
 	TestsPath           string
 	ChartsRootPath      string
 	Verbose             bool
+	ShowVersion         bool
 	Formats             []string
 	Threshold           float64
 	MaxScenarios        int
@@ -51,9 +52,13 @@ func ParseConfig(args []string) (Config, error) {
 	fs.BoolVar(&cfg.MarkdownIncludeTpl, "markdown-include-tpl", false, "include tpl(...) inline template sources in markdown output")
 	fs.StringVar(&cfg.KubeVersion, "kube-version", "1.28.0", "Kubernetes version for .Capabilities context")
 	fs.BoolVar(&cfg.Verbose, "verbose", false, "print per-file and uncovered coverage details")
+	fs.BoolVar(&cfg.ShowVersion, "version", false, "print the helmcov version and exit")
 
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
+	}
+	if cfg.ShowVersion {
+		return cfg, nil
 	}
 
 	if cfg.ChartPath != "" && cfg.ChartsRootPath != "" {
