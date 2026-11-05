@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jordan-simonovski/helmcov/internal/chartloader"
-	"github.com/jordan-simonovski/helmcov/internal/coverage"
-	"github.com/jordan-simonovski/helmcov/internal/instrumentation"
-	"github.com/jordan-simonovski/helmcov/internal/reporters"
-	"github.com/jordan-simonovski/helmcov/internal/valuegen"
+	"github.com/ClickHouse/helmcov/internal/chartloader"
+	"github.com/ClickHouse/helmcov/internal/coverage"
+	"github.com/ClickHouse/helmcov/internal/instrumentation"
+	"github.com/ClickHouse/helmcov/internal/reporters"
+	"github.com/ClickHouse/helmcov/internal/valuegen"
 )
 
 func Run(args []string, stdout io.Writer) error {

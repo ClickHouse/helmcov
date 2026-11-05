@@ -1,4 +1,4 @@
-module github.com/jordan-simonovski/helmcov
+module github.com/ClickHouse/helmcov
 
 go 1.25.0
 

@@ -28,7 +28,7 @@ inputs:
   repository:
     description: GitHub repository that hosts helmcov release assets.
     required: false
-    default: jordan-simonovski/helmcov
+    default: ClickHouse/helmcov
   comment:
     description: Post or update a pull request comment with markdown coverage results.
     required: false

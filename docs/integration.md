@@ -6,7 +6,7 @@
 2. Add the GitHub Action (recommended):
 
 ```yaml
-- uses: jordan-simonovski/helmcov@v1
+- uses: ClickHouse/helmcov@v1
   with:
     chart: charts/my-app
     threshold: "70"

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jordan-simonovski/helmcov/internal/instrumentation"
+	"github.com/ClickHouse/helmcov/internal/instrumentation"
 )
 
 type Report struct {
