@@ -35,13 +35,13 @@ func TestWriteMarkdownEdges(t *testing.T) {
 			name:    "zero threshold hides the threshold row",
 			report:  halfCovered,
 			opts:    MarkdownOptions{},
-			notWant: []string{"| Threshold |"},
+			notWant: []string{"threshold |"},
 		},
 		{
 			name:   "line rate equal to the threshold meets it",
 			report: halfCovered,
 			opts:   MarkdownOptions{Threshold: 50},
-			want:   []string{"| Threshold | 50% (met) |"},
+			want:   []string{"| Line threshold | 50% (met) |"},
 		},
 		{
 			name:    "file summary with no files is left out",
@@ -100,5 +100,30 @@ func TestWritersReturnWriteErrors(t *testing.T) {
 	// The header succeeds, so this fails on the first coverage line.
 	if err := WriteGoCoverProfile(report, &failingWriter{after: 1}); err == nil {
 		t.Error("coverprofile line: want the write error, got nil")
+	}
+}
+
+func TestWriteMarkdownShowsBothThresholds(t *testing.T) {
+	t.Parallel()
+
+	report := coverage.Report{Files: map[string]coverage.FileCoverage{
+		"t.yaml": {Lines: map[int]int{1: 1, 2: 1, 3: 1, 4: 0}, Branches: map[string]int{"1:if:true": 1, "1:if:false": 0}},
+	}}
+	var buf bytes.Buffer
+	if err := WriteMarkdown(report, &buf, MarkdownOptions{Threshold: 75, BranchThreshold: 60}); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"| Line threshold | 75% (met) |", "| Branch threshold | 60% (not met) |"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("markdown missing %q:\n%s", want, buf.String())
+		}
+	}
+
+	buf.Reset()
+	if err := WriteMarkdown(report, &buf, MarkdownOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "threshold |") {
+		t.Errorf("no threshold rows expected when both are zero:\n%s", buf.String())
 	}
 }

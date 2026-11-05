@@ -10,6 +10,7 @@ import (
 
 type MarkdownOptions struct {
 	Threshold         float64
+	BranchThreshold   float64
 	CommentMarker     string
 	ShowFileSummary   bool
 	IncludeTplSources bool
@@ -33,7 +34,10 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 	fmt.Fprintf(&b, "| Line coverage | %.2f%% |\n", lineRate)
 	fmt.Fprintf(&b, "| Branch coverage | %.2f%% |\n", branchRate)
 	if opts.Threshold > 0 {
-		fmt.Fprintf(&b, "| Threshold | %.0f%% %s |\n", opts.Threshold, thresholdStatus(lineRate, opts.Threshold))
+		fmt.Fprintf(&b, "| Line threshold | %.0f%% %s |\n", opts.Threshold, thresholdStatus(lineRate, opts.Threshold))
+	}
+	if opts.BranchThreshold > 0 {
+		fmt.Fprintf(&b, "| Branch threshold | %.0f%% %s |\n", opts.BranchThreshold, thresholdStatus(branchRate, opts.BranchThreshold))
 	}
 	b.WriteString("\n")
 
@@ -100,8 +104,8 @@ func markdownFiles(report coverage.Report, includeTplSources bool) []string {
 	return filtered
 }
 
-func thresholdStatus(lineRate float64, threshold float64) string {
-	if lineRate >= threshold {
+func thresholdStatus(rate float64, threshold float64) string {
+	if rate >= threshold {
 		return "(met)"
 	}
 	return "(not met)"

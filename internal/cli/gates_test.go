@@ -372,3 +372,53 @@ tests:
 		t.Errorf("both lookup branches should be covered:\n%s", stdout.String())
 	}
 }
+
+func TestRunBranchThresholdGate(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		flags   []string
+		wantErr []string
+	}{
+		{name: "met at the boundary", flags: []string{"--branch-threshold", "50"}},
+		{name: "missed", flags: []string{"--branch-threshold", "50.5"}, wantErr: []string{"branch coverage 50.00 is below branch threshold 50.50"}},
+		{
+			name:    "both gates missed are both reported",
+			flags:   []string{"--threshold", "60", "--branch-threshold", "70"},
+			wantErr: []string{"coverage 50.00 is below threshold 60.00", "branch coverage 50.00 is below branch threshold 70.00"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := runHalfCovered(t, tc.flags...)
+			if len(tc.wantErr) == 0 {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("want an error containing %q", tc.wantErr)
+			}
+			for _, want := range tc.wantErr {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not contain %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestParseConfigBranchThresholdBounds(t *testing.T) {
+	t.Parallel()
+
+	for value, ok := range map[string]bool{"-1": false, "0": true, "100": true, "100.5": false} {
+		chart, tests := halfCoveredChart(t)
+		_, err := ParseConfig([]string{"--chart", chart, "--tests", tests, "--branch-threshold", value})
+		if ok != (err == nil) {
+			t.Errorf("--branch-threshold %s: err = %v", value, err)
+		}
+	}
+}

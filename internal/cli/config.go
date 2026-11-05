@@ -18,6 +18,7 @@ type Config struct {
 	ShowVersion         bool
 	Formats             []string
 	Threshold           float64
+	BranchThreshold     float64
 	MaxScenarios        int
 	Seed                int64
 	GoCoverProfilePath  string
@@ -41,7 +42,8 @@ func ParseConfig(args []string) (Config, error) {
 	fs.StringVar(&cfg.TestsPath, "tests", "", "path to helm-unittest suites")
 	fs.StringVar(&cfg.ChartsRootPath, "charts", "", "root path containing nested Helm charts")
 	fs.StringVar(&cfg.ChartsRootPath, "charts-root", "", "deprecated alias for --charts")
-	fs.Float64Var(&cfg.Threshold, "threshold", 0, "minimum coverage threshold")
+	fs.Float64Var(&cfg.Threshold, "threshold", 0, "minimum line coverage percentage")
+	fs.Float64Var(&cfg.BranchThreshold, "branch-threshold", 0, "minimum branch coverage percentage")
 	fs.IntVar(&cfg.MaxScenarios, "max-scenarios", 20, "max generated scenarios")
 	fs.Int64Var(&cfg.Seed, "seed", 42, "seed for generated scenarios")
 	fs.StringVar(&cfg.GoCoverProfilePath, "go-coverprofile", "coverage.out", "path for go coverprofile output")
@@ -95,6 +97,9 @@ func ParseConfig(args []string) (Config, error) {
 
 	if cfg.Threshold < 0 || cfg.Threshold > 100 {
 		return Config{}, fmt.Errorf("threshold must be between 0 and 100, got %v", cfg.Threshold)
+	}
+	if cfg.BranchThreshold < 0 || cfg.BranchThreshold > 100 {
+		return Config{}, fmt.Errorf("branch-threshold must be between 0 and 100, got %v", cfg.BranchThreshold)
 	}
 	if cfg.MaxScenarios <= 0 {
 		return Config{}, fmt.Errorf("max-scenarios must be > 0, got %d", cfg.MaxScenarios)
