@@ -8,13 +8,13 @@ tests:
           of: Service
   - it: renders disabled configmap variant
     values:
-      - tests/values/disabled.yaml
+      - values/disabled.yaml
     asserts:
       - isKind:
           of: ConfigMap
   - it: covers empty ports branch
     values:
-      - tests/values/empty-ports.yaml
+      - values/empty-ports.yaml
     asserts:
       - equal:
           path: spec.ports[0].port

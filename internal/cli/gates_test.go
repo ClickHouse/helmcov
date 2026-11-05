@@ -260,3 +260,43 @@ func TestRunReturnsStdoutErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestRunRendersEachTestWithItsOwnValues(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	chart := filepath.Join(base, "chart")
+	writeTestFile(t, filepath.Join(chart, "Chart.yaml"), "apiVersion: v2\nname: demo\nversion: 0.1.0\n")
+	writeTestFile(t, filepath.Join(chart, "values.yaml"), "on: false\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "a.yaml"), "{{- if .Values.on }}\na: on\n{{- end }}\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "b.yaml"), "{{- if .Values.on }}\nb: on\n{{- end }}\n")
+	writeTestFile(t, filepath.Join(chart, "tests", "t_test.yaml"), `suite: t
+templates:
+  - templates/a.yaml
+  - templates/b.yaml
+tests:
+  - it: turns a on
+    template: templates/a.yaml
+    set:
+      on: true
+`)
+
+	var stdout bytes.Buffer
+	err := Run([]string{
+		"--chart", chart, "--tests", filepath.Join(chart, "tests"), "--max-scenarios", "1", "--verbose",
+		"--go-coverprofile", filepath.Join(base, "c.out"), "--cobertura-file", filepath.Join(base, "c.xml"),
+	}, &stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a := filepath.Join(chart, "templates", "a.yaml")
+	b := filepath.Join(chart, "templates", "b.yaml")
+	out := stdout.String()
+	if strings.Contains(out, a+":1") {
+		t.Errorf("a.yaml should be fully covered by the test's set value:\n%s", out)
+	}
+	if !strings.Contains(out, b+`:1 "{{- if .Values.on }}" (if:true)`) {
+		t.Errorf("b.yaml's true branch should stay uncovered; the test only renders a.yaml:\n%s", out)
+	}
+}

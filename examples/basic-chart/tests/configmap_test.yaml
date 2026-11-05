@@ -21,7 +21,7 @@ tests:
           value: "true"
   - it: renders disabled feature from values file
     values:
-      - tests/values/disabled.yaml
+      - values/disabled.yaml
     asserts:
       - equal:
           path: data.feature

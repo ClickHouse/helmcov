@@ -6,7 +6,8 @@
 Dynamic Helm template coverage for branch-heavy charts.
 
 `helmcov` executes Helm templates with chart values, helm-unittest suite values,
-and generated branch-oriented scenarios to estimate:
+each test's own `values` and `set`, and generated branch-oriented scenarios to
+estimate:
 
 - line coverage in template files
 - branch coverage for `if`, `range`, and `with`
@@ -88,7 +89,10 @@ Mode rules:
   - default: `helmcov-comment`
 - `--threshold`: minimum line coverage percentage (0-100)
   - command fails if actual line coverage is lower
-- `--max-scenarios`: cap for generated value scenarios per suite
+- `--max-scenarios`: cap for value scenarios per suite, including the suite's
+  own values. Each helm-unittest test also renders with its own values on top.
+  `1` adds no generated variants, so coverage is close to what the tests
+  exercise.
   - default: `20`
 - `--seed`: random seed for deterministic scenario ordering
   - default: `42`
