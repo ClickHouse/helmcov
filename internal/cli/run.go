@@ -76,8 +76,17 @@ func Run(args []string, stdout io.Writer) error {
 	}
 
 	lineCoverage := report.LineRate() * 100
+	branchCoverage := report.BranchRate() * 100
+	// Check both gates so one run reports every miss.
+	var gateErrs []error
 	if lineCoverage < cfg.Threshold {
-		return fmt.Errorf("coverage %.2f is below threshold %.2f", lineCoverage, cfg.Threshold)
+		gateErrs = append(gateErrs, fmt.Errorf("coverage %.2f is below threshold %.2f", lineCoverage, cfg.Threshold))
+	}
+	if branchCoverage < cfg.BranchThreshold {
+		gateErrs = append(gateErrs, fmt.Errorf("branch coverage %.2f is below branch threshold %.2f", branchCoverage, cfg.BranchThreshold))
+	}
+	if err := errors.Join(gateErrs...); err != nil {
+		return err
 	}
 
 	formats := append([]string(nil), cfg.Formats...)
@@ -90,7 +99,7 @@ func Run(args []string, stdout io.Writer) error {
 		strings.Join(formats, ","),
 		totalSuites,
 		lineCoverage,
-		report.BranchRate()*100,
+		branchCoverage,
 	)
 	if err != nil {
 		return err
@@ -252,6 +261,7 @@ func writeRequestedFormats(cfg Config, report coverage.Report) error {
 			if err := writeToFile(cfg.MarkdownPath, func(w io.Writer) error {
 				return reporters.WriteMarkdown(report, w, reporters.MarkdownOptions{
 					Threshold:         cfg.Threshold,
+					BranchThreshold:   cfg.BranchThreshold,
 					CommentMarker:     cfg.CommentMarker,
 					ShowFileSummary:   cfg.MarkdownFileSummary,
 					IncludeTplSources: cfg.MarkdownIncludeTpl,

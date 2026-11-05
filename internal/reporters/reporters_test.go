@@ -109,7 +109,7 @@ func TestWriteMarkdownIncludesSummaryAndMarker(t *testing.T) {
 		"## Helm template coverage",
 		"| Line coverage | 50.00% |",
 		"| Branch coverage | 50.00% |",
-		"| Threshold | 70% (not met) |",
+		"| Line threshold | 70% (not met) |",
 		"| templates/configmap.yaml | 50.00% | 50.00% |",
 		"<summary>Uncovered details</summary>",
 		"**Uncovered lines:** 2",
@@ -190,7 +190,7 @@ func TestWriteMarkdownReportsThresholdMet(t *testing.T) {
 		t.Fatalf("write markdown: %v", err)
 	}
 
-	if !strings.Contains(buf.String(), "| Threshold | 50% (met) |") {
+	if !strings.Contains(buf.String(), "| Line threshold | 50% (met) |") {
 		t.Fatalf("expected threshold met marker, got:\n%s", buf.String())
 	}
 }

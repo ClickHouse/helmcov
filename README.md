@@ -69,7 +69,7 @@ gh attestation verify helmcov_<version>_<os>_<arch>.tar.gz --repo ClickHouse/hel
 helmcov --chart charts/my-app                  # suites in charts/my-app/tests
 helmcov --chart charts/my-app --tests path/to/suites
 helmcov --charts charts                        # every chart under charts/
-helmcov --chart charts/my-app --threshold 80 --verbose
+helmcov --chart charts/my-app --threshold 80 --branch-threshold 70 --verbose
 ```
 
 | Flag | Default | Meaning |
@@ -78,6 +78,7 @@ helmcov --chart charts/my-app --threshold 80 --verbose
 | `--tests` | `<chart>/tests` | helm-unittest suites (`*_test.yaml`) |
 | `--charts` | | Directory of charts, each with suites in `<chart>/tests`; replaces `--chart` |
 | `--threshold` | `0` | Fail when line coverage is below this percentage |
+| `--branch-threshold` | `0` | Fail when branch coverage is below this percentage. Both gates are checked and every miss is reported |
 | `--format` | `go` and `cobertura` | Output format, repeatable: `go`, `cobertura`, `markdown` |
 | `--go-coverprofile` | `coverage.out` | Go coverprofile path |
 | `--cobertura-file` | `coverage.xml` | Cobertura XML path |
@@ -117,6 +118,7 @@ jobs:
         with:
           chart: charts/my-app
           threshold: "80"
+          branch-threshold: "70"
 ```
 
 For a repository with many charts, use `charts: charts` instead of `chart`.
@@ -127,6 +129,7 @@ For a repository with many charts, use `charts: charts` instead of `chart`.
 | `tests` | `<chart>/tests` | helm-unittest suites |
 | `charts` | | Directory of charts; replaces `chart` |
 | `threshold` | `0` | Fail the step when line coverage is below this percentage |
+| `branch-threshold` | `0` | Fail the step when branch coverage is below this percentage |
 | `version` | `latest` | helmcov release tag, `latest`, or `dev` to build from the action's source |
 | `comment` | `true` | Post or update the pull request comment |
 | `comment-marker` | `helmcov-comment` | Identifies the comment to update |
