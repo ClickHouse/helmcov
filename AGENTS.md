@@ -73,9 +73,18 @@ Trace keys are part of the output contract. Changing their format changes every
 user's reports.
 
 - Line key: `<template path>:<line>`.
-- Branch key: `<template path>:<line>:<construct>:<outcome>`, for example
-  `if:true`/`if:false`, `range:empty`/`range:non-empty`,
-  `with:empty`/`with:non-empty`.
+- Branch key: `<template path>:<line>:<construct>:<outcome>`. Constructs and
+  outcomes:
+  - `if`, `else-if`: `true`/`false`
+  - `range`: `empty`/`non-empty`
+  - `with`, `else-with`: `empty`/`non-empty`
+  - `and(N)`, `or(N)`: `true`/`false` for operand N, recorded only when
+    `and`/`or` evaluates it. Literal operands and a value piped into
+    `and`/`or` are not tracked.
+  - `default`: `value`/`fallback`
+  - `ternary`: `true`/`false`
+  - `coalesce(N)`: `used` when argument N is the one returned
+- Two constructs of the same kind on one line share keys, so their hits add up.
 - Hits are recorded while the template executes, so conditions see the real
   dot, variables and `include` arguments.
 - A branch counts as covered when its hit count is above zero in any scenario.

@@ -37,8 +37,8 @@ func bindHelmTemplateFuncs(t *template.Template, trace *Trace) {
 		"required":      required,
 		"fail":          func(string) string { return "" },
 		"lookup":        lookup,
-		hitFunc:         hitFuncFor(trace),
 	})
+	maps.Copy(funcMap, coverageFuncs(trace))
 	t.Funcs(funcMap)
 }
 

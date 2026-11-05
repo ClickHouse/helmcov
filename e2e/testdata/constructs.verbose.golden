@@ -1,4 +1,4 @@
-helmcov: target=testdata/constructs tests=testdata/constructs/tests formats=cobertura,go suites=2 line-coverage=92.00% branch-coverage=66.67%
+helmcov: target=testdata/constructs tests=testdata/constructs/tests formats=cobertura,go suites=2 line-coverage=92.00% branch-coverage=65.38%
 coverage details:
 template: testdata/constructs/templates/_helpers.tpl
   line-coverage: 71.43% (5/7)
@@ -12,12 +12,16 @@ template: testdata/constructs/templates/conditionals.yaml
   uncovered lines:
     - none
   uncovered branches:
+    - testdata/constructs/templates/conditionals.yaml:13 "{{- if and .Values.featureA .Values.featureB }}" (and(1):false)
     - testdata/constructs/templates/conditionals.yaml:17 "{{- if gt (int .Values.replicas) 1 }}" (if:false)
 template: testdata/constructs/templates/functions.yaml
   line-coverage: 95.00% (19/20)
   uncovered lines:
     - testdata/constructs/templates/functions.yaml:8 "tplOfMissing: truthy"
   uncovered branches:
+    - testdata/constructs/templates/functions.yaml:12 "defaulted: {{ .Values.missing | default \"fallback\" }}" (default:value)
+    - testdata/constructs/templates/functions.yaml:14 "ternary: {{ ternary \"on\" \"off\" .Values.featureA }}" (ternary:false)
+    - testdata/constructs/templates/functions.yaml:15 "coalesce: {{ coalesce .Values.missing .Values.mode }}" (coalesce(1):used)
     - testdata/constructs/templates/functions.yaml:16 "{{- if empty .Values.annotations }}" (if:false)
     - testdata/constructs/templates/functions.yaml:19 "{{- if hasKey .Values \"labels\" }}" (if:false)
     - testdata/constructs/templates/functions.yaml:7 "{{- if tpl \"{{ .Values.missing }}\" . }}" (if:true)
@@ -37,8 +41,8 @@ template: testdata/constructs/templates/scopes.yaml
     - testdata/constructs/templates/scopes.yaml:12 "{{- else with .Values.fallback }}"
     - testdata/constructs/templates/scopes.yaml:13 "greeting: {{ . }}"
   uncovered branches:
-    - testdata/constructs/templates/scopes.yaml:12 "{{- else with .Values.fallback }}" (with:empty)
-    - testdata/constructs/templates/scopes.yaml:12 "{{- else with .Values.fallback }}" (with:non-empty)
+    - testdata/constructs/templates/scopes.yaml:12 "{{- else with .Values.fallback }}" (else-with:empty)
+    - testdata/constructs/templates/scopes.yaml:12 "{{- else with .Values.fallback }}" (else-with:non-empty)
     - testdata/constructs/templates/scopes.yaml:15 "{{- range .Values.items }}" (range:empty)
     - testdata/constructs/templates/scopes.yaml:7 "{{- with .Values.config }}" (with:empty)
 template: tpl:99151209
