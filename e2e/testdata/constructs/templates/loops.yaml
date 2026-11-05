@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "constructs.fullname" . }}-loops
+data:
+  {{- range .Values.items }}
+  {{- if .enabled }}
+  {{ .name }}: enabled
+  {{- end }}
+  {{- end }}
+  {{- range $key, $value := .Values.labels }}
+  label-{{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- range .Values.annotations }}
+  annotation: {{ . }}
+  {{- else }}
+  annotations: none
+  {{- end }}
+  {{- range $i, $item := .Values.items }}
+  {{- if not $item.enabled }}{{ break }}{{ end }}
+  first-enabled-{{ $i }}: {{ $item.name }}
+  {{- end }}
+  {{- range $n := int .Values.replicas }}
+  replica-{{ $n }}: "true"
+  {{- end }}

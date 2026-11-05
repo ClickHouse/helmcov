@@ -64,6 +64,11 @@ func TestRenderAndTraceRecordsBranchesInExecutionScope(t *testing.T) {
 			want: map[string]int{"t.yaml:1:range:non-empty": 1, "t.yaml:2:if:true": 1, "t.yaml:2:if:false": 0},
 		},
 		{
+			name: "tpl of a missing value is empty, as in Helm",
+			tpl:  "{{- if tpl \"{{ .Values.missing }}\" . }}x{{ end }}\n",
+			want: map[string]int{"t.yaml:1:if:true": 0, "t.yaml:1:if:false": 1},
+		},
+		{
 			name: "branches under an untaken branch are registered at zero",
 			tpl:  "{{- if not .Values.flag }}\n{{- if .Values.other }}x{{ end }}\n{{- end }}\n",
 			want: map[string]int{"t.yaml:2:if:true": 0, "t.yaml:2:if:false": 0},

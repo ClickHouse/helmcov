@@ -1,0 +1,16 @@
+mode: dev
+replicas: 1
+debug: false
+featureA: true
+featureB: false
+items:
+  - name: a
+    enabled: true
+  - name: b
+    enabled: false
+labels:
+  team: platform
+annotations: {}
+config:
+  greeting: hello
+message: "greeting is {{ .Values.config.greeting }}"

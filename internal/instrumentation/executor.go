@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"text/template"
 )
 
@@ -48,5 +49,5 @@ func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[st
 	if err := parsed.Execute(&rendered, values); err != nil {
 		return trace, "", fmt.Errorf("execute template %s: %w", templateName, err)
 	}
-	return trace, rendered.String(), nil
+	return trace, strings.ReplaceAll(rendered.String(), "<no value>", ""), nil
 }
