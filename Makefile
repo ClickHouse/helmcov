@@ -1,20 +1,21 @@
 SHELL := /bin/bash
 
-.PHONY: help setup hooks tidy fmt fmt-check lint test cover integration-test build ci release-check
+.PHONY: help setup hooks tidy tidy-check fmt fmt-check lint test cover integration-test build ci release-check
 
 help:
 	@echo "Targets:"
 	@echo "  make setup            # install hooks and tidy modules"
 	@echo "  make hooks            # install git commit-msg hook"
 	@echo "  make tidy             # go mod tidy"
+	@echo "  make tidy-check       # fail if go.mod or go.sum need tidying"
 	@echo "  make fmt              # format Go code"
 	@echo "  make fmt-check        # fail if Go code is not formatted"
 	@echo "  make lint             # go vet + optional golangci-lint"
 	@echo "  make test             # run all Go tests"
-	@echo "  make cover            # run tests with coverage, fail under 70%"
+	@echo "  make cover            # run tests with race detector and coverage, fail under 70%"
 	@echo "  make integration-test # run integration-oriented CLI tests"
 	@echo "  make build            # build CLI binary"
-	@echo "  make ci               # fmt-check + lint + test + integration-test + build"
+	@echo "  make ci               # tidy-check + fmt-check + lint + cover + integration-test + build"
 	@echo "  make release-check    # ci + goreleaser config validation (if installed)"
 
 setup: hooks tidy
@@ -24,6 +25,9 @@ hooks:
 
 tidy:
 	go mod tidy
+
+tidy-check:
+	go mod tidy -diff
 
 fmt:
 	gofmt -w .
@@ -59,7 +63,7 @@ integration-test:
 build:
 	go build ./cmd/helmcov
 
-ci: fmt-check lint cover integration-test build
+ci: tidy-check fmt-check lint cover integration-test build
 
 release-check: ci
 	@if command -v goreleaser >/dev/null 2>&1; then \

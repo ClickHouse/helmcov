@@ -1,7 +1,7 @@
 # helmcov
 
 [![Release](https://img.shields.io/github/v/release/ClickHouse/helmcov)](https://github.com/ClickHouse/helmcov/releases)
-[![Coverage](https://img.shields.io/badge/coverage-73.8%25-green)](#development-workflow)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ClickHouse/helmcov/badges/coverage.json)](#development-workflow)
 
 Dynamic Helm template coverage for branch-heavy charts.
 
@@ -178,11 +178,13 @@ using `version: dev` to build from source on pull requests.
 
 CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`, and enforces:
 
-- `gofmt` formatting checks
-- `go vet` and `golangci-lint` linting
-- full Go test suite + explicit integration tests
+- `go mod tidy` and `gofmt` checks
+- `go vet` and a pinned `golangci-lint` (config in `.golangci.yml`)
+- the full Go test suite with the race detector, a 70% coverage minimum, and
+  the integration tests
 - build validation
-- Conventional Commit PR titles when code files changed (squash-merge friendly)
+- `govulncheck` against known Go vulnerabilities
+- Conventional Commit PR titles on every pull request (`pr-title.yml`)
 
 The workflow executes `make ci` so CI and local checks stay aligned.
 

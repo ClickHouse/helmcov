@@ -1,3 +1,4 @@
+// Package cli parses flags and runs one coverage pass over the selected charts.
 package cli
 
 import (
