@@ -103,6 +103,8 @@ user's reports.
   lines, comments and lines holding only `define`, `else` or `end` are not.
 - `define` blocks are reported against the file that defines them. The top
   level of a helper file never renders, so it is not reported.
+- A test's own values render as Helm would: `fail` and `required` stop the render.
+  A test that asserts `failedTemplate` counts the lines run before the failure.
 
 When you add a construct, add its keys to this list in the same PR.
 
