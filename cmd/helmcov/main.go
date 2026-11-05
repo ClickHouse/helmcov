@@ -1,3 +1,4 @@
+// Command helmcov reports line and branch coverage for Helm chart templates.
 package main
 
 import (

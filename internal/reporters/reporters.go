@@ -1,3 +1,4 @@
+// Package reporters writes coverage reports as Go coverprofile, Cobertura XML and markdown.
 package reporters
 
 import (

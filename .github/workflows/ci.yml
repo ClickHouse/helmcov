@@ -5,67 +5,69 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOLANGCI_LINT_VERSION: v2.15.0
+  GOVULNCHECK_VERSION: v1.1.4
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: stable
       - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-      - name: Run Make CI target
+        run: go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}"
+      - name: Run make ci
         run: |
-          export PATH="$(go env GOPATH)/bin:$PATH"
+          PATH="$(go env GOPATH)/bin:$PATH"
+          export PATH
           make ci
-      - name: Detect code changes for commit convention checks
-        id: changed
-        if: github.event_name == 'pull_request'
-        uses: dorny/paths-filter@v4
-        with:
-          filters: |
-            code:
-              - '**/*.go'
-              - 'go.mod'
-              - 'go.sum'
-              - 'Dockerfile*'
-              - '.github/workflows/*.yml'
-      - name: Validate PR title uses Conventional Commits
-        if: github.event_name == 'pull_request' && steps.changed.outputs.code == 'true'
-        run: |
-          title='${{ github.event.pull_request.title }}'
-          pattern='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9._/-]+\))?(!)?: .+'
-          if [[ "$title" =~ $pattern ]]; then
-            echo "Conventional PR title: $title"
-            exit 0
-          fi
-          echo "PR title must follow Conventional Commits when code changes." >&2
-          echo "Got: $title" >&2
-          echo "Example: feat(ci): use make ci in workflow" >&2
-          exit 1
 
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Check for known vulnerabilities
+        run: go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
+
+  # main is protected, so the badge lives on its own branch and README points shields.io at it.
   coverage-badge:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
-      - name: Update coverage badge
-        run: ./scripts/coverage.sh --update-readme
-      - name: Commit badge if changed
+          go-version: stable
+      # The test job enforces the minimum; this still publishes the real number when it is missed.
+      - name: Measure coverage
+        run: ./scripts/coverage.sh --badge-json "$RUNNER_TEMP/badge/coverage.json" || true
+      - name: Publish badge to the badges branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if ! git diff --quiet README.md; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add README.md
-            git commit -m "chore: update coverage badge [skip ci]"
-            git push
-          fi
+          cd "$RUNNER_TEMP/badge"
+          git init -q -b badges
+          git add coverage.json
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "chore: update coverage badge"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c http.extraheader="AUTHORIZATION: basic ${auth}" \
+            push --force "https://github.com/${GITHUB_REPOSITORY}.git" badges

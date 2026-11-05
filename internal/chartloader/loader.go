@@ -1,3 +1,4 @@
+// Package chartloader reads charts, values, helm-unittest suites and the Helm render context.
 package chartloader
 
 import (
