@@ -48,12 +48,12 @@ func toJSON(value any) string {
 	return string(data)
 }
 
-func mustToJSON(value any) string {
+func mustToJSON(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return string(data)
+	return string(data), nil
 }
 
 func toYAMLPretty(value any) string {

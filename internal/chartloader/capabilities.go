@@ -69,9 +69,6 @@ func normalizeKubeVersion(version string) string {
 func kubeMajorMinor(version string) (string, string) {
 	trimmed := strings.TrimPrefix(version, "v")
 	parts := strings.SplitN(trimmed, ".", 3)
-	if len(parts) == 0 {
-		return "1", "0"
-	}
 	major := parts[0]
 	minor := "0"
 	if len(parts) > 1 {

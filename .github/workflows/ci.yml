@@ -15,6 +15,7 @@ concurrency:
 env:
   GOLANGCI_LINT_VERSION: v2.15.0
   GOVULNCHECK_VERSION: v1.9.0
+  GREMLINS_VERSION: v0.6.0
 
 jobs:
   test:
@@ -43,6 +44,21 @@ jobs:
           go-version: stable
       - name: Check for known vulnerabilities
         run: go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
+
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Install gremlins
+        run: go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
+      - name: Run mutation tests
+        run: |
+          PATH="$(go env GOPATH)/bin:$PATH"
+          export PATH
+          make mutation
 
   # main is protected, so the badge lives on its own branch and README points shields.io at it.
   coverage-badge:

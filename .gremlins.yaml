@@ -1,0 +1,9 @@
+unleash:
+  # The tests take milliseconds, and gremlins scales each mutant's timeout from that baseline.
+  timeout-coefficient: 60
+  threshold:
+    efficacy: 80
+
+mutants:
+  invert-logical:
+    enabled: true

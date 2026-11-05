@@ -4,7 +4,7 @@ set -euo pipefail
 # Runs Go tests with coverage, fails if total line coverage is below THRESHOLD.
 # Pass --badge-json <path> to also write a shields.io endpoint badge.
 
-threshold="${THRESHOLD:-70}"
+threshold="${THRESHOLD:-85}"
 profile="coverage-go.out"
 badge_json=""
 if [ "${1:-}" = "--badge-json" ]; then

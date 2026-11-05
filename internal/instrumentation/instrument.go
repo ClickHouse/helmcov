@@ -28,10 +28,8 @@ func hitFuncFor(trace *Trace) func(string) string {
 // helper file never renders, so it is left out.
 func instrumentTemplates(root *template.Template, target string, sources map[string]string, trace *Trace) {
 	for _, tmpl := range root.Templates() {
+		// Templates() only returns parsed templates, so Tree is always set.
 		tree := tmpl.Tree
-		if tree == nil || tree.Root == nil {
-			continue
-		}
 		isDefine := tmpl.Name() != tree.ParseName
 		if !isDefine && tmpl.Name() != target {
 			continue
@@ -58,7 +56,7 @@ func (in *instrumenter) list(list *parse.ListNode) {
 	if list == nil {
 		return
 	}
-	nodes := make([]parse.Node, 0, 2*len(list.Nodes))
+	nodes := make([]parse.Node, 0, len(list.Nodes))
 	for _, node := range list.Nodes {
 		for _, line := range in.coverableLines(node) {
 			nodes = append(nodes, in.marker(node.Position(), in.registerLine(line)))
