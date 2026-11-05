@@ -31,10 +31,6 @@ func Generate(base map[string]any, options Options) []map[string]any {
 		setPath(next, variant.path, variant.value)
 		scenarios = append(scenarios, next)
 	}
-
-	if len(scenarios) > limit {
-		return scenarios[:limit]
-	}
 	return scenarios
 }
 
@@ -135,13 +131,6 @@ func setPath(root map[string]any, path string, value any) {
 	current := root
 	for i, part := range parts {
 		if i == len(parts)-1 {
-			if emptyMap, ok := value.(map[string]any); ok && len(emptyMap) == 0 {
-				if existing, exists := current[part]; exists {
-					if existingMap, mapOK := existing.(map[string]any); mapOK && len(existingMap) > 0 {
-						return
-					}
-				}
-			}
 			current[part] = value
 			return
 		}

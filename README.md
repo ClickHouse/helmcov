@@ -183,7 +183,7 @@ CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`, and 
 
 - `go mod tidy` and `gofmt` checks
 - `go vet` and a pinned `golangci-lint` (config in `.golangci.yml`)
-- the full Go test suite with the race detector, a 70% coverage minimum, and
+- the full Go test suite with the race detector, an 85% coverage minimum, and
   the integration tests
 - build validation
 - `govulncheck` against known Go vulnerabilities

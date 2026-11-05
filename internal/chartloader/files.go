@@ -156,16 +156,9 @@ func matchChartFileGlob(pattern, name string) (bool, error) {
 		prefix := strings.TrimSuffix(pattern, "/**")
 		return name == prefix || strings.HasPrefix(name, prefix+"/"), nil
 	}
+	// path.Match already handled direct children, so only the directory itself is left.
 	if strings.HasSuffix(pattern, "/*") {
-		prefix := strings.TrimSuffix(pattern, "/*")
-		if name == prefix {
-			return true, nil
-		}
-		if !strings.HasPrefix(name, prefix+"/") {
-			return false, nil
-		}
-		rest := strings.TrimPrefix(name, prefix+"/")
-		return !strings.Contains(rest, "/"), nil
+		return name == strings.TrimSuffix(pattern, "/*"), nil
 	}
 
 	return false, nil

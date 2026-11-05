@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help setup hooks tidy tidy-check fmt fmt-check lint test cover integration-test e2e build ci release-check
+.PHONY: help setup hooks tidy tidy-check fmt fmt-check lint test cover integration-test e2e mutation build ci release-check
 
 help:
 	@echo "Targets:"
@@ -12,9 +12,10 @@ help:
 	@echo "  make fmt-check        # fail if Go code is not formatted"
 	@echo "  make lint             # go vet + optional golangci-lint"
 	@echo "  make test             # run all Go tests"
-	@echo "  make cover            # run tests with race detector and coverage, fail under 70%"
+	@echo "  make cover            # run tests with race detector and coverage, fail under 85%"
 	@echo "  make integration-test # run integration-oriented CLI tests"
 	@echo "  make e2e              # build the binary and run it against e2e/testdata charts"
+	@echo "  make mutation         # gremlins mutation testing on every internal package"
 	@echo "  make build            # build CLI binary"
 	@echo "  make ci               # tidy-check + fmt-check + lint + cover + integration-test + e2e + build"
 	@echo "  make release-check    # ci + goreleaser config validation (if installed)"
@@ -63,6 +64,13 @@ integration-test:
 
 e2e:
 	go test ./e2e -count=1 -v
+
+mutation:
+	@command -v gremlins >/dev/null || { echo "install gremlins: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0" >&2; exit 1; }
+	@for dir in $$(go list -f '{{.Dir}}' ./internal/...); do \
+		echo "== $$dir"; \
+		(cd "$$dir" && gremlins unleash) || exit 1; \
+	done
 
 build:
 	go build ./cmd/helmcov

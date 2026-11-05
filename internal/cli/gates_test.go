@@ -1,0 +1,262 @@
+package cli
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// halfCoveredChart has one template where 2 of 4 coverable lines and 1 of 2
+// branches render with the default values.
+func halfCoveredChart(t *testing.T) (chart, tests string) {
+	t.Helper()
+	base := t.TempDir()
+	chart = filepath.Join(base, "chart")
+	tests = filepath.Join(chart, "tests")
+	writeTestFile(t, filepath.Join(chart, "Chart.yaml"), "apiVersion: v2\nname: demo\nversion: 0.1.0\n")
+	writeTestFile(t, filepath.Join(chart, "values.yaml"), "x: false\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "t.yaml"), "a: 1\n{{- if .Values.x }}\nb: 2\nc: 3\n{{- end }}\n")
+	writeTestFile(t, filepath.Join(tests, "t_test.yaml"), "suite: t\ntemplates:\n  - templates/t.yaml\n")
+	return chart, tests
+}
+
+func runHalfCovered(t *testing.T, extra ...string) (string, error) {
+	t.Helper()
+	chart, tests := halfCoveredChart(t)
+	out := t.TempDir()
+	args := append([]string{
+		"--chart", chart, "--tests", tests, "--max-scenarios", "1",
+		"--go-coverprofile", filepath.Join(out, "c.out"),
+		"--cobertura-file", filepath.Join(out, "c.xml"),
+	}, extra...)
+	var stdout bytes.Buffer
+	err := Run(args, &stdout)
+	return stdout.String(), err
+}
+
+func TestRunThresholdGate(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		threshold string
+		wantErr   bool
+	}{
+		{threshold: "0", wantErr: false},
+		{threshold: "50", wantErr: false},
+		{threshold: "50.5", wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.threshold, func(t *testing.T) {
+			t.Parallel()
+			stdout, err := runHalfCovered(t, "--threshold", tc.threshold)
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "coverage 50.00 is below threshold 50.50") {
+					t.Fatalf("err = %v, want the below-threshold error", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(stdout, "line-coverage=50.00% branch-coverage=50.00%") {
+				t.Errorf("summary = %q", stdout)
+			}
+		})
+	}
+}
+
+func TestRunVerboseFlag(t *testing.T) {
+	t.Parallel()
+
+	quiet, err := runHalfCovered(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(quiet, "coverage details") {
+		t.Errorf("details printed without --verbose:\n%s", quiet)
+	}
+}
+
+func TestRunVerboseListsEveryUncoveredLineAndBranch(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	chart := filepath.Join(base, "chart")
+	writeTestFile(t, filepath.Join(chart, "Chart.yaml"), "apiVersion: v2\nname: demo\nversion: 0.1.0\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "full.yaml"), "z: 1\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "two.yaml"), "{{- if .Values.x }}\nb: 2\n{{- end }}\n{{- if .Values.y }}\nc: 3\n{{- end }}\n")
+	writeTestFile(t, filepath.Join(chart, "tests", "t_test.yaml"), "suite: t\ntemplates:\n  - templates/full.yaml\n  - templates/two.yaml\n")
+
+	var stdout bytes.Buffer
+	err := Run([]string{
+		"--chart", chart, "--tests", filepath.Join(chart, "tests"), "--max-scenarios", "1", "--verbose",
+		"--go-coverprofile", filepath.Join(base, "c.out"), "--cobertura-file", filepath.Join(base, "c.xml"),
+	}, &stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	full := filepath.Join(chart, "templates", "full.yaml")
+	two := filepath.Join(chart, "templates", "two.yaml")
+	want := fmt.Sprintf(`coverage details:
+template: %[1]s
+  line-coverage: 100.00%% (1/1)
+  uncovered lines:
+    - none
+  uncovered branches:
+    - none
+template: %[2]s
+  line-coverage: 50.00%% (2/4)
+  uncovered lines:
+    - %[2]s:2 "b: 2"
+    - %[2]s:5 "c: 3"
+  uncovered branches:
+    - %[2]s:1 "{{- if .Values.x }}" (if:true)
+    - %[2]s:4 "{{- if .Values.y }}" (if:true)
+`, full, two)
+	_, details, _ := strings.Cut(stdout.String(), "\n")
+	if details != want {
+		t.Errorf("verbose output =\n%s\nwant\n%s", details, want)
+	}
+}
+
+func TestRunReportsUnwritableOutputs(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string][]string{
+		"write go coverprofile": {"--format", "go", "--go-coverprofile", "BLOCKED/c.out"},
+		"write cobertura XML":   {"--format", "cobertura", "--cobertura-file", "BLOCKED/c.xml"},
+		"write markdown":        {"--format", "markdown", "--markdown-file", "BLOCKED/c.md"},
+	}
+	for want, flags := range cases {
+		t.Run(want, func(t *testing.T) {
+			t.Parallel()
+			// A regular file where a directory is needed makes the write fail.
+			blocker := filepath.Join(t.TempDir(), "file")
+			writeTestFile(t, blocker, "")
+			for i, flag := range flags {
+				flags[i] = strings.Replace(flag, "BLOCKED", blocker, 1)
+			}
+			_, err := runHalfCovered(t, flags...)
+			if err == nil || !strings.HasPrefix(err.Error(), want) {
+				t.Fatalf("err = %v, want prefix %q", err, want)
+			}
+		})
+	}
+}
+
+func TestParseConfigBounds(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		flags   []string
+		wantErr string
+	}{
+		{flags: []string{"--threshold", "-1"}, wantErr: "threshold must be between 0 and 100"},
+		{flags: []string{"--threshold", "100.5"}, wantErr: "threshold must be between 0 and 100"},
+		{flags: []string{"--threshold", "0"}},
+		{flags: []string{"--threshold", "100"}},
+		{flags: []string{"--max-scenarios", "0"}, wantErr: "max-scenarios must be > 0"},
+		{flags: []string{"--max-scenarios", "1"}},
+	}
+	for _, tc := range cases {
+		t.Run(strings.Join(tc.flags, " "), func(t *testing.T) {
+			t.Parallel()
+			chart, tests := halfCoveredChart(t)
+			_, err := ParseConfig(append([]string{"--chart", chart, "--tests", tests}, tc.flags...))
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("err = %v, want %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestParseConfigRejectsChartsRootWithoutCharts(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "nested", "values.yaml"), "x: 1\n")
+	if _, err := ParseConfig([]string{"--charts", root}); err == nil {
+		t.Fatal("want an error for a charts root with no Chart.yaml")
+	}
+}
+
+func TestLabelsPreferChartsRoot(t *testing.T) {
+	t.Parallel()
+
+	single := Config{ChartPath: "chart", TestsPath: "chart/tests"}
+	if targetLabel(single) != "chart" || testsLabel(single) != "chart/tests" {
+		t.Errorf("single chart labels = %q, %q", targetLabel(single), testsLabel(single))
+	}
+	monorepo := Config{ChartsRootPath: "charts", ChartPath: "ignored"}
+	if targetLabel(monorepo) != "charts" || testsLabel(monorepo) != "<auto: chart/tests>" {
+		t.Errorf("charts root labels = %q, %q", targetLabel(monorepo), testsLabel(monorepo))
+	}
+}
+
+func TestSourceLine(t *testing.T) {
+	t.Parallel()
+
+	lines := []string{"  first  ", "second"}
+	for number, want := range map[int]string{0: "", 1: "first", 2: "second", 3: ""} {
+		if got := sourceLine(lines, number); got != want {
+			t.Errorf("sourceLine(%d) = %q, want %q", number, got, want)
+		}
+	}
+}
+
+func TestRefsFallBackWhenSourceIsUnreadable(t *testing.T) {
+	t.Parallel()
+
+	missing := filepath.Join(t.TempDir(), "gone.yaml")
+	if got := uncoveredLineRefs(missing, []int{3}); len(got) != 1 || got[0] != missing+":3" {
+		t.Errorf("line refs = %v", got)
+	}
+	if got := uncoveredBranchRefs(missing, []string{"3:if:true"}); len(got) != 1 || got[0] != missing+" (3:if:true)" {
+		t.Errorf("branch refs = %v", got)
+	}
+
+	present := filepath.Join(t.TempDir(), "t.yaml")
+	if err := os.WriteFile(present, []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := uncoveredBranchRefs(present, []string{"legacy"}); len(got) != 1 || got[0] != present+" (legacy)" {
+		t.Errorf("malformed branch ref = %v", got)
+	}
+}
+
+type failAfterWriter struct{ writes int }
+
+func (w *failAfterWriter) Write(p []byte) (int, error) {
+	if w.writes == 0 {
+		return 0, errors.New("stdout closed")
+	}
+	w.writes--
+	return len(p), nil
+}
+
+func TestRunReturnsStdoutErrors(t *testing.T) {
+	t.Parallel()
+
+	for _, writes := range []int{0, 1} {
+		chart, tests := halfCoveredChart(t)
+		out := t.TempDir()
+		err := Run([]string{
+			"--chart", chart, "--tests", tests, "--verbose",
+			"--go-coverprofile", filepath.Join(out, "c.out"), "--cobertura-file", filepath.Join(out, "c.xml"),
+		}, &failAfterWriter{writes: writes})
+		if err == nil || err.Error() != "stdout closed" {
+			t.Errorf("after %d writes: err = %v, want stdout closed", writes, err)
+		}
+	}
+}

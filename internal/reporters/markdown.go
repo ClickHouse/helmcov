@@ -23,7 +23,6 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 
 	lineRate := report.LineRate() * 100
 	branchRate := report.BranchRate() * 100
-	thresholdStatus := thresholdStatus(lineRate, opts.Threshold)
 	files := markdownFiles(report, opts.IncludeTplSources)
 
 	var b strings.Builder
@@ -34,7 +33,7 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 	fmt.Fprintf(&b, "| Line coverage | %.2f%% |\n", lineRate)
 	fmt.Fprintf(&b, "| Branch coverage | %.2f%% |\n", branchRate)
 	if opts.Threshold > 0 {
-		fmt.Fprintf(&b, "| Threshold | %.0f%% %s |\n", opts.Threshold, thresholdStatus)
+		fmt.Fprintf(&b, "| Threshold | %.0f%% %s |\n", opts.Threshold, thresholdStatus(lineRate, opts.Threshold))
 	}
 	b.WriteString("\n")
 
@@ -102,9 +101,6 @@ func markdownFiles(report coverage.Report, includeTplSources bool) []string {
 }
 
 func thresholdStatus(lineRate float64, threshold float64) string {
-	if threshold <= 0 {
-		return ""
-	}
 	if lineRate >= threshold {
 		return "(met)"
 	}

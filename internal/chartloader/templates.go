@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -46,15 +45,6 @@ func LoadTemplateFiles(chartPath string) (map[string]string, error) {
 	return files, nil
 }
 
-func SortedTemplatePaths(files map[string]string) []string {
-	paths := make([]string, 0, len(files))
-	for path := range files {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-	return paths
-}
-
 func isTemplateFile(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".yaml", ".yml", ".tpl", ".txt":
@@ -75,9 +65,6 @@ func ResolveTemplatePath(chartPath, templatePath string) (string, error) {
 	candidates := []string{
 		filepath.Join(chartPath, templatePath),
 		filepath.Join(chartPath, "templates", templatePath),
-	}
-	if trimmed := strings.TrimPrefix(templatePath, "templates/"); trimmed != templatePath {
-		candidates = append(candidates, filepath.Join(chartPath, "templates", trimmed))
 	}
 
 	for _, candidate := range candidates {

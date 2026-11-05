@@ -31,8 +31,9 @@ The CLI flags, the output formats and the action inputs are the public contract.
 | `make setup` | Install the commit-msg hook and tidy modules, once per clone |
 | `make test` | All Go tests |
 | `make integration-test` | The CLI run against `examples/` |
+| `make mutation` | Mutation testing on every `internal/` package with gremlins |
 | `make e2e` | The built binary against `e2e/testdata`, plus a render diff against `helm template` |
-| `make cover` | Tests with coverage; fails below 70% |
+| `make cover` | Tests with coverage; fails below 85% |
 | `make lint` | `go vet` plus golangci-lint |
 | `make ci` | What CI runs. Run it before pushing |
 
@@ -97,6 +98,16 @@ When you add a construct, add its keys to this list in the same PR.
   `testdata/` directory. Keep inline fixtures for single-test cases.
 - Assert exact trace keys and hit counts, not just percentages. A percentage
   can stay the same while the wrong branch is counted.
+- Check that new tests catch bugs, not just run code, with
+  [gremlins](https://github.com/go-gremlins/gremlins) mutation testing. Install
+  it with `go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0`,
+  then run `gremlins unleash -S l` inside the package directory, or
+  `make mutation` for all of them. Settings live in `.gremlins.yaml`; every
+  package must kill more than 80% of its mutants.
+- A `LIVED` mutant marks a line where a bug would go unnoticed. Add an
+  assertion that fails for it; symmetric test data, such as half the lines
+  covered, is the usual cause. Leave a mutant only when it is equivalent (the
+  code behaves the same either way) and say which ones in the PR.
 - Every bug fix comes with a test that fails without the fix.
 - `e2e/` builds the real binary and checks its output against golden files
   for `e2e/testdata/constructs`, a chart with one template per traced
