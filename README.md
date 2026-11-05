@@ -1,38 +1,47 @@
 # helmcov
 
 [![Release](https://img.shields.io/github/v/release/ClickHouse/helmcov)](https://github.com/ClickHouse/helmcov/releases)
-[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ClickHouse/helmcov/badges/coverage.json)](#development-workflow)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ClickHouse/helmcov/badges/coverage.json)](CONTRIBUTING.md)
 
-Dynamic Helm template coverage for branch-heavy charts.
+helmcov measures line and branch coverage of Helm chart templates from your
+[helm-unittest](https://github.com/helm-unittest/helm-unittest) suites. Helm
+bugs tend to hide in conditionals and loops that only run under particular
+values, and helmcov shows which of those your tests never reach.
 
-`helmcov` executes Helm templates with chart values, helm-unittest suite values,
-each test's own `values` and `set`, and generated branch-oriented scenarios to
-estimate:
+It writes a Go coverprofile, Cobertura XML for CI dashboards, and a markdown
+summary for pull request comments. A GitHub Action wraps it in one step.
 
-- line coverage in template files
-- branch coverage for `if`/`else if`, `range`, `with`/`else with`, each
-  `and`/`or` operand, and the outcomes of `default`, `ternary` and `coalesce`
+## How it works
 
-Templates render the way helm-unittest renders them: with its default release
-(`RELEASE-NAME` in `NAMESPACE`), Kubernetes 1.20 and no API versions, plus any
-`release`, `capabilities` and `chart` a suite or test sets, and with
-`templates` globs such as `"*.yaml"` expanded. A chart that branches on
+helmcov renders each template that the suites list, recording which lines
+and branches run. It renders with:
+
+- the chart's values plus each suite's `values` and `set`
+- each test's own `values` and `set` on top
+- up to `--max-scenarios` generated variants per suite that flip booleans and
+  empty or fill lists and maps, to reach branches the suites miss
+
+Rendering matches helm-unittest. The default release is `RELEASE-NAME` in
+`NAMESPACE`, with Kubernetes 1.20 and no API versions, and any `release`,
+`capabilities` and `chart` a suite or test sets apply on top. `templates` globs
+such as `"*.yaml"` expand the same way. A chart that branches on
 `.Capabilities.APIVersions.Has` needs its suites to list those versions under
-`capabilities.apiVersions`, as helm-unittest itself does. `--kube-version`
-sets the Kubernetes version for suites that do not.
+`capabilities.apiVersions`, as helm-unittest itself requires.
 
-Coverage counts the chart's own templates. Suites may also list a packaged
-dependency's templates (`charts/<subchart>/templates/...`); helmcov skips those.
+Helm's built-ins work as they do in Helm, including `.Files`, `.helmignore`,
+`tpl`, `toYaml` and how values files are parsed. An e2e test diffs helmcov's output
+against `helm template` to keep it that way.
 
-It emits:
+Branches are tracked for:
 
-- native Go `coverprofile`
-- Cobertura XML (for CI/reporting systems)
+- `if` and `else if`, `with` and `else with`, and `range` (empty or not)
+- each operand of `and` and `or` that gets evaluated
+- whether `default` used its fallback, which side `ternary` took, and which
+  `coalesce` argument was used
 
-## Why this exists
-
-Helm failures often live in conditionals and loops that only show up under
-specific values. `helmcov` focuses on those divergent branches.
+Lines that hold only `define`, `else` or `end`, comments, and blank lines are
+not counted. Strings rendered through `tpl` are reported per file but left out
+of the totals.
 
 ## Install
 
@@ -50,103 +59,46 @@ this repository's release workflow:
 gh attestation verify helmcov_<version>_<os>_<arch>.tar.gz --repo ClickHouse/helmcov
 ```
 
-The GitHub Action checks each download against the release's `checksums.txt`
-before running it.
-
-## Development workflow
-
-Use the repo `Makefile` to run local checks and setup:
-
-```bash
-make setup
-make ci
-```
-
-`make setup` installs a native git `commit-msg` hook and runs `go mod tidy`.
-`make ci` runs formatting checks, linting, tests (including integration tests),
-and build.
-
 ## Usage
 
 ```bash
-helmcov --chart <chart-dir> --tests <tests-dir> [flags]
-helmcov --charts <charts-dir> [flags]
+helmcov --chart charts/my-app                  # suites in charts/my-app/tests
+helmcov --chart charts/my-app --tests path/to/suites
+helmcov --charts charts                        # every chart under charts/
+helmcov --chart charts/my-app --threshold 80 --verbose
 ```
 
-### Required flags
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--chart` | | Chart directory (with `Chart.yaml`) |
+| `--tests` | `<chart>/tests` | helm-unittest suites (`*_test.yaml`) |
+| `--charts` | | Directory of charts, each with suites in `<chart>/tests`; replaces `--chart` |
+| `--threshold` | `0` | Fail when line coverage is below this percentage |
+| `--format` | `go` and `cobertura` | Output format, repeatable: `go`, `cobertura`, `markdown` |
+| `--go-coverprofile` | `coverage.out` | Go coverprofile path |
+| `--cobertura-file` | `coverage.xml` | Cobertura XML path |
+| `--markdown-file` | `coverage.md` | Markdown report path |
+| `--markdown-file-summary` | off | Add a per-file table to the markdown report |
+| `--markdown-include-tpl` | off | List `tpl` sources in the markdown report |
+| `--comment-marker` | `helmcov-comment` | HTML comment that identifies the markdown report |
+| `--max-scenarios` | `20` | Value scenarios per suite, including the suite's own values. `1` adds no generated variants, so coverage is close to what the tests alone reach |
+| `--seed` | `42` | Seed for choosing generated variants |
+| `--kube-version` | `1.20.0` | Kubernetes version for suites that set none |
+| `--verbose` | off | Print each file's uncovered lines and branches with their source |
+| `--version` | | Print the helmcov version and exit |
 
-- `--chart`: path to chart root directory (must include `Chart.yaml`)
-- `--tests`: path to helm-unittest suites (must include at least one `*_test.yaml`)
-  - optional in `--chart` mode; defaults to `<chart>/tests`
-- `--charts`: root directory containing one or more nested charts (recursive `Chart.yaml` discovery)
-- `--charts-root`: deprecated alias for `--charts`
+`--verbose` output names each gap as `path:line "source" (outcome)`, for
+example `templates/service.yaml:12 "{{- if .Values.tls }}" (if:true)`.
 
-Mode rules:
+## GitHub Action
 
-- Single-chart mode: use `--chart` with `--tests`
-- Monorepo mode: use `--charts` (tests are auto-discovered as `<chart>/tests`)
-- `--chart` and `--charts` are mutually exclusive
-
-### Optional flags
-
-- `--format`: output format (`go`, `cobertura`, `markdown`), repeatable
-  - default: both `go` and `cobertura`
-- `--go-coverprofile`: output file for Go coverprofile
-  - default: `coverage.out`
-- `--cobertura-file`: output file for Cobertura XML
-  - default: `coverage.xml`
-- `--markdown-file`: output file for markdown PR comment report
-  - default: `coverage.md`
-- `--comment-marker`: HTML comment marker embedded in markdown output
-  - default: `helmcov-comment`
-- `--threshold`: minimum line coverage percentage (0-100)
-  - command fails if actual line coverage is lower
-- `--max-scenarios`: cap for value scenarios per suite, including the suite's
-  own values. Each helm-unittest test also renders with its own values on top.
-  `1` adds no generated variants, so coverage is close to what the tests
-  exercise.
-  - default: `20`
-- `--seed`: random seed for deterministic scenario ordering
-  - default: `42`
-- `--verbose`: print CI-friendly per-file details, including uncovered lines and branch edges
-  - includes exact uncovered line refs as `path:line("source")`
-- `--version`: print the helmcov version and exit
-
-## Example commands
-
-Run against included examples:
-
-```bash
-go run ./cmd/helmcov --chart examples/basic-chart --tests examples/basic-chart/tests
-go run ./cmd/helmcov --chart examples/branch-heavy-chart --tests examples/branch-heavy-chart/tests
-go run ./cmd/helmcov --charts examples/monorepo/charts
-```
-
-Write both outputs to custom locations:
-
-```bash
-go run ./cmd/helmcov \
-  --chart examples/branch-heavy-chart \
-  --tests examples/branch-heavy-chart/tests \
-  --format go \
-  --format cobertura \
-  --go-coverprofile out/helm.coverage.out \
-  --cobertura-file out/helm.cobertura.xml \
-  --threshold 70
-```
-
-## GitHub Actions integration
-
-### Published action (recommended)
-
-Add Helm template coverage to pull requests with a single step. The action
-installs a release binary, runs helmcov, and upserts a PR comment with
-line/branch coverage and uncovered details.
+The action installs a release binary, checks it against the release's
+`checksums.txt`, runs helmcov, and keeps one pull request comment up to date
+with the results.
 
 ```yaml
 name: helm-coverage
-on:
-  pull_request:
+on: pull_request
 
 permissions:
   contents: read
@@ -157,142 +109,62 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: ClickHouse/helmcov@v1
         with:
           chart: charts/my-app
-          tests: charts/my-app/tests
-          threshold: "70"
+          threshold: "80"
 ```
 
-Monorepo mode:
+For a repository with many charts, use `charts: charts` instead of `chart`.
 
-```yaml
-      - uses: ClickHouse/helmcov@v1
-        with:
-          charts: charts
-          threshold: "65"
-```
+| Input | Default | Meaning |
+|-------|---------|---------|
+| `chart` | | Chart directory |
+| `tests` | `<chart>/tests` | helm-unittest suites |
+| `charts` | | Directory of charts; replaces `chart` |
+| `threshold` | `0` | Fail the step when line coverage is below this percentage |
+| `version` | `latest` | helmcov release tag, `latest`, or `dev` to build from the action's source |
+| `comment` | `true` | Post or update the pull request comment |
+| `comment-marker` | `helmcov-comment` | Identifies the comment to update |
+| `token` | `github.token` | Token used to comment |
+| `file-summary` | `false` | Add a per-file table to the comment |
+| `include-tpl-sources` | `false` | List `tpl` sources in the comment |
+| `markdown-file` | `helmcov-coverage.md` | Where to write the markdown report |
+| `max-scenarios` | `20` | As `--max-scenarios` |
+| `seed` | `42` | As `--seed` |
+| `kube-version` | `1.20.0` | As `--kube-version` |
+| `repository` | `ClickHouse/helmcov` | Repository to download releases from |
 
-Action inputs:
+Outputs: `line-coverage`, `branch-coverage` (percentages) and `markdown-file`.
 
-| Input | Description | Default |
-|-------|-------------|---------|
-| `chart` | Path to chart root | — |
-| `tests` | Path to helm-unittest suites | `<chart>/tests` |
-| `charts` | Monorepo charts root | — |
-| `threshold` | Minimum line coverage % | `0` |
-| `version` | Release tag (`v0.4.2`), `latest`, or `dev` | `latest` |
-| `comment` | Post/update PR comment | `true` |
-| `comment-marker` | Marker for comment upsert | `helmcov-comment` |
+To run the CLI in CI without the action, download a release or use
+`go install`, then upload `coverage.xml` to your coverage service.
 
-Requirements for consuming repositories:
+## Coverage reports
 
-- helm-unittest suites (`*_test.yaml`) under the chart tests directory
-- `pull-requests: write` when PR comments are enabled
+- Cobertura XML is read by GitLab's coverage visualisation, Jenkins and
+  Codecov. SonarQube's generic coverage import uses a different format, so it
+  needs a conversion step.
+- The Go coverprofile uses Go's `mode: count` format with template paths in
+  place of Go files, for tools that merge or diff profiles. `go tool cover`
+  itself needs Go sources and cannot render it.
+- The markdown report is what the action posts on pull requests.
 
-This repository dogfoods the action in `.github/workflows/helmcov-action.yml`
-using `version: dev` to build from source on pull requests.
+## Limitations
 
-### CI in this repository
-
-CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`, and enforces:
-
-- `go mod tidy` and `gofmt` checks
-- `go vet` and a pinned `golangci-lint` (config in `.golangci.yml`)
-- the full Go test suite with the race detector, an 85% coverage minimum, and
-  the integration tests
-- build validation
-- `govulncheck` against known Go vulnerabilities
-- Conventional Commit PR titles on every pull request (`pr-title.yml`)
-
-The workflow executes `make ci` so CI and local checks stay aligned.
-
-### Manual workflow (binary)
-
-```yaml
-name: helmcov
-on: [pull_request]
-jobs:
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - run: go build -o helmcov ./cmd/helmcov
-      - run: |
-          ./helmcov \
-            --chart examples/branch-heavy-chart \
-            --tests examples/branch-heavy-chart/tests \
-            --format go \
-            --format cobertura
-      - uses: actions/upload-artifact@v4
-        with:
-          name: helmcov-reports
-          path: |
-            coverage.out
-            coverage.xml
-```
-
-## Local commit-msg gate
-
-Conventional commit validation runs locally via a native git `commit-msg` hook.
-
-Setup:
-
-```bash
-make hooks
-```
-
-The hook source lives in `.githooks/commit-msg` and validates commit subjects
-with `scripts/validate-conventional-commit.sh`.
-
-## Release and vendoring workflows
-
-- `.github/workflows/release-please.yml`: maintains semver releases and
-  `CHANGELOG.md` using Release Please.
-- `.github/workflows/release.yml`: publishes multi-OS binaries and Docker image
-  through GoReleaser when Release Please cuts a release, then uploads vendored
-  artifacts as a second job using the GoReleaser `dist/` artifact handoff. Run
-  it manually with a `tag` input to rebuild an existing release.
-- `.github/workflows/vendor-artifacts.yml`: downloads a tagged release and
-  uploads binaries plus image references as reusable artifacts. Manual fallback
-  workflow for backfills and retries.
-- Detailed runbook: `docs/release-flow.md`.
-
-## Semver workflow
-
-1. Merge changes into `main`.
-2. Release Please opens/updates a release PR with version bump + changelog.
-3. Merge that PR to create `vX.Y.Z` tag and GitHub release.
-4. `release.yml` publishes binaries and GHCR image tags for that version.
-5. `release.yml` vendor job downloads release assets and uploads vendored
-   artifacts.
-6. Optional: run `vendor-artifacts.yml` manually for backfill/retry.
-
-Release Please infers bump level from Conventional Commit prefixes (`feat`,
-`fix`, and `!`/`BREAKING CHANGE`).
-
-Tag and image convention is `vX.Y.Z`:
-
-- Git tag: `vX.Y.Z`
-- GitHub release: `vX.Y.Z`
-- GHCR image: `ghcr.io/<owner>/helmcov:vX.Y.Z` (+ `latest`)
-
-## SonarQube integration notes
-
-SonarQube does not natively parse Helm template coverage. The pragmatic path:
-
-1. generate Cobertura XML from `helmcov`
-2. feed Cobertura XML into your reporting pipeline as generic coverage input
-3. map/report results at CI stage until native Helm support exists
+- Branch keys include only the line, so two constructs of the same kind on one
+  line share keys and their hits add up.
+- `lookup` returns nothing and helm-unittest's `kubernetesProvider` is not
+  modelled, so branches on cluster state stay uncovered.
+- helm-unittest's `documentSelector` is not modelled: a test renders whole
+  templates.
 
 ## Contributing
 
-See `CONTRIBUTING.md`. Coding agents should read `AGENTS.md`.
+See [CONTRIBUTING.md](CONTRIBUTING.md); coding agents should read
+[AGENTS.md](AGENTS.md). Releases are described in
+[docs/release-flow.md](docs/release-flow.md).
 
 ## Licence
 
-Apache-2.0. See `LICENSE`.
+Apache-2.0. See [LICENSE](LICENSE).
