@@ -1,0 +1,11 @@
+suite: parity
+templates:
+  - templates/files.yaml
+  - templates/yaml.yaml
+  - templates/secret.yaml
+tests:
+  - it: renders
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: templates/files.yaml

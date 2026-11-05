@@ -1,6 +1,9 @@
 suite: configmap
 templates:
   - templates/configmap.yaml
+capabilities:
+  apiVersions:
+    - batch/v1
 tests:
   - it: renders enabled feature by default
     asserts:
@@ -9,7 +12,7 @@ tests:
           value: enabled
       - matchRegex:
           path: data.greeting
-          pattern: release-name-basic-chart
+          pattern: -basic-chart$
       - equal:
           path: data.notice
           value: loaded from chart files

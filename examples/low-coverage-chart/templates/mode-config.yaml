@@ -7,4 +7,4 @@ metadata:
 data:
   mode: {{ if eq .Values.deploymentMode "prod" }}"prod"{{ else }}"dev"{{ end }}
   policy: {{ tpl (.Values.policy | default "mode={{ .Values.deploymentMode }}") . | quote }}
-  note: {{ .Files.Get "mode.txt" | quote }}
+  note: {{ .Files.Get "files/mode.txt" | trim | quote }}

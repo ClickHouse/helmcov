@@ -1,0 +1,15 @@
+nested:
+  list:
+    - name: a
+      ports: [80, 443]
+    - name: b
+  map:
+    key: value
+    deeper:
+      x: 1
+text: |
+  line one
+  line two
+flagOff: off
+bigNumber: 1000000
+date: 2024-01-02

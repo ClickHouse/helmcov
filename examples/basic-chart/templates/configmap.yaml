@@ -8,7 +8,7 @@ data:
   feature: {{ if .Values.feature.enabled }}"enabled"{{ else }}"disabled"{{ end }}
   message: {{ .Values.message | quote }}
   greeting: {{ tpl .Values.greeting . | quote }}
-  notice: {{ .Files.Get "notice.txt" | quote }}
+  notice: {{ .Files.Get "files/notice.txt" | trim | quote }}
   {{- $settings := .Values.settings | fromYaml }}
   theme: {{ $settings.theme | default "light" | quote }}
   {{- if .Capabilities.APIVersions.Has "batch/v1" }}
