@@ -54,9 +54,8 @@ Examples:
 - `feat(report): add verbose uncovered line refs`
 - `feat!: change default report format`
 
-CI validates Conventional Commit PR titles on pull requests when code files are
-changed. This aligns with squash-merge workflows where the PR title becomes the
-merge commit on `main`.
+CI validates the Conventional Commit format of every PR title, including after
+the title is edited, because the PR title becomes the squash commit on `main`.
 
 ## Tagging Convention
 

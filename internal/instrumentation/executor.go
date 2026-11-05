@@ -1,3 +1,4 @@
+// Package instrumentation renders templates with Helm's function map and records line and branch hits.
 package instrumentation
 
 import (

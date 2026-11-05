@@ -1,0 +1,21 @@
+name: pr-title
+
+# The PR title becomes the squash commit that Release Please reads, so check it on every edit.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the PR title follows Conventional Commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s\n' "$TITLE" > "$RUNNER_TEMP/title"
+          ./scripts/validate-conventional-commit.sh "$RUNNER_TEMP/title"

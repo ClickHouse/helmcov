@@ -1,3 +1,4 @@
+// Package coverage merges render traces into the report model every reporter reads.
 package coverage
 
 import (

@@ -1,3 +1,4 @@
+// Package valuegen generates value scenarios that flip template branches.
 package valuegen
 
 import (
@@ -12,10 +13,7 @@ type Options struct {
 }
 
 func Generate(base map[string]any, options Options) []map[string]any {
-	max := options.MaxScenarios
-	if max <= 0 {
-		max = 1
-	}
+	limit := max(options.MaxScenarios, 1)
 
 	scenarios := []map[string]any{deepCopy(base)}
 	variants := buildVariants(base)
@@ -26,7 +24,7 @@ func Generate(base map[string]any, options Options) []map[string]any {
 	})
 
 	for _, variant := range variants {
-		if len(scenarios) >= max {
+		if len(scenarios) >= limit {
 			break
 		}
 		next := deepCopy(base)
@@ -34,8 +32,8 @@ func Generate(base map[string]any, options Options) []map[string]any {
 		scenarios = append(scenarios, next)
 	}
 
-	if len(scenarios) > max {
-		return scenarios[:max]
+	if len(scenarios) > limit {
+		return scenarios[:limit]
 	}
 	return scenarios
 }
