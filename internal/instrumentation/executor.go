@@ -3,6 +3,7 @@ package instrumentation
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -20,9 +21,15 @@ type LookupFunc func(apiVersion, kind, namespace, name string) (map[string]any, 
 
 // Executor renders templates. Lookup answers lookup; nil means no cluster, so
 // lookup returns an empty map as it does under helm template.
+// Strict makes fail and required stop the render as they do in Helm.
 type Executor struct {
 	Lookup LookupFunc
+	Strict bool
 }
+
+// ErrExecute marks an error raised while a parsed template executes, as opposed to
+// a parse or lookup failure.
+var ErrExecute = errors.New("execute template")
 
 func NewExecutor() *Executor {
 	return &Executor{}
@@ -39,7 +46,7 @@ func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[st
 	sources[templateName] = tpl
 
 	root := template.New("gotpl").Option("missingkey=zero")
-	bindHelmTemplateFuncs(root, &trace, e.Lookup)
+	bindHelmTemplateFuncs(root, &trace, e.Lookup, e.Strict)
 	for _, path := range slices.Sorted(maps.Keys(sources)) {
 		if _, err := root.New(path).Parse(sources[path]); err != nil {
 			return trace, "", fmt.Errorf("parse template %s: %w", path, err)
@@ -54,7 +61,7 @@ func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[st
 
 	var rendered bytes.Buffer
 	if err := parsed.Execute(&rendered, values); err != nil {
-		return trace, "", fmt.Errorf("execute template %s: %w", templateName, err)
+		return trace, "", fmt.Errorf("%w %s: %w", ErrExecute, templateName, err)
 	}
 	return trace, strings.ReplaceAll(rendered.String(), "<no value>", ""), nil
 }

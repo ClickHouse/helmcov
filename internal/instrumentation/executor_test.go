@@ -1,6 +1,7 @@
 package instrumentation
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -381,5 +382,39 @@ func TestRenderAndTraceRegistersUnhitTplBranch(t *testing.T) {
 	}
 	if trace.Branches[sourceName+":1:if:true"] != 0 {
 		t.Fatalf("expected tpl if true branch to remain unhit")
+	}
+}
+
+func TestRenderAndTraceFailAndRequired(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		strict   bool
+		template string
+		wantErr  string
+	}{
+		{name: "lenient fail keeps rendering", template: `{{ fail "boom" }}after`},
+		{name: "lenient required keeps rendering", template: `{{ required "need x" .x }}after`},
+		{name: "strict fail stops", strict: true, template: `{{ fail "boom" }}after`, wantErr: "boom"},
+		{name: "strict required stops on missing value", strict: true, template: `{{ required "need x" .x }}after`, wantErr: "need x"},
+		{name: "strict required stops on empty string", strict: true, template: `{{ required "need y" .y }}after`, wantErr: "need y"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			exec := Executor{Strict: tc.strict}
+			_, out, err := exec.RenderAndTrace("t.yaml", tc.template, map[string]any{"y": ""}, nil)
+			if tc.wantErr == "" {
+				if err != nil || !strings.HasSuffix(out, "after") {
+					t.Fatalf("expected render to continue, got out=%q err=%v", out, err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) || !errors.Is(err, ErrExecute) {
+				t.Fatalf("expected execute error containing %q, got %v", tc.wantErr, err)
+			}
+		})
 	}
 }
