@@ -10,7 +10,8 @@ each test's own `values` and `set`, and generated branch-oriented scenarios to
 estimate:
 
 - line coverage in template files
-- branch coverage for `if`, `range`, and `with`
+- branch coverage for `if`/`else if`, `range`, `with`/`else with`, each
+  `and`/`or` operand, and the outcomes of `default`, `ternary` and `coalesce`
 
 Coverage counts the chart's own templates. Suites may also list a packaged
 dependency's templates (`charts/<subchart>/templates/...`); helmcov skips those.
