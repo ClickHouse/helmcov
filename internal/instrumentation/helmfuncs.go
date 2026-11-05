@@ -2,7 +2,6 @@ package instrumentation
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"hash/fnv"
 	"maps"
@@ -15,12 +14,15 @@ import (
 
 const recursionMaxNums = 1000
 
-func baseHelmFuncMap() template.FuncMap {
+// bindHelmTemplateFuncs gives t Helm's function map. Templates cannot read the
+// environment, and required and fail never stop a render, because generated
+// scenarios often leave required values unset.
+func bindHelmTemplateFuncs(t *template.Template, trace *Trace) {
+	includedNames := make(map[string]int)
 	funcMap := sprig.TxtFuncMap()
 	delete(funcMap, "env")
 	delete(funcMap, "expandenv")
-
-	extras := template.FuncMap{
+	maps.Copy(funcMap, template.FuncMap{
 		"toYaml":        toYAML,
 		"mustToYaml":    mustToYAML,
 		"toYamlPretty":  toYAMLPretty,
@@ -30,24 +32,13 @@ func baseHelmFuncMap() template.FuncMap {
 		"mustToJson":    mustToJSON,
 		"fromJson":      fromJSON,
 		"fromJsonArray": fromJSONArray,
-		"include":       func(string, any) (string, error) { return "", fmt.Errorf("include not bound") },
-		"tpl":           func(string, any) (string, error) { return "", fmt.Errorf("tpl not bound") },
-		"required":      requiredFunc(false),
-		"fail":          failFunc(false),
+		"include":       includeFun(t, includedNames),
+		"tpl":           tplFun(t, includedNames, trace),
+		"required":      required,
+		"fail":          func(string) string { return "" },
 		"lookup":        lookup,
-	}
-	maps.Copy(funcMap, extras)
-	return funcMap
-}
-
-func bindHelmTemplateFuncs(t *template.Template, trace *Trace) {
-	includedNames := make(map[string]int)
-	funcMap := baseHelmFuncMap()
-	funcMap["include"] = includeFun(t, includedNames)
-	funcMap["tpl"] = tplFun(t, includedNames, trace)
-	funcMap["required"] = requiredFunc(true)
-	funcMap["fail"] = failFunc(true)
-	funcMap[hitFunc] = hitFuncFor(trace)
+		hitFunc:         hitFuncFor(trace),
+	})
 	t.Funcs(funcMap)
 }
 
@@ -112,39 +103,19 @@ func toYAML(value any) string {
 	return strings.TrimSuffix(string(data), "\n")
 }
 
-func mustToYAML(value any) string {
+func mustToYAML(value any) (string, error) {
 	data, err := yaml.Marshal(value)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return strings.TrimSuffix(string(data), "\n")
+	return strings.TrimSuffix(string(data), "\n"), nil
 }
 
-func requiredFunc(lintMode bool) func(string, any) (any, error) {
-	return func(message string, value any) (any, error) {
-		if value == nil {
-			if lintMode {
-				return "", nil
-			}
-			return nil, errors.New(message)
-		}
-		if typed, ok := value.(string); ok && typed == "" {
-			if lintMode {
-				return "", nil
-			}
-			return nil, errors.New(message)
-		}
-		return value, nil
+func required(_ string, value any) any {
+	if value == nil {
+		return ""
 	}
-}
-
-func failFunc(lintMode bool) func(string) (string, error) {
-	return func(message string) (string, error) {
-		if lintMode {
-			return "", nil
-		}
-		return "", errors.New(message)
-	}
+	return value
 }
 
 func lookup(string, string, string, string) (map[string]any, error) {

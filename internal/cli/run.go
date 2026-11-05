@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -91,7 +92,7 @@ func Run(args []string, stdout io.Writer) error {
 	}
 
 	lineCoverage := report.LineRate() * 100
-	if cfg.Threshold > 0 && lineCoverage < cfg.Threshold {
+	if lineCoverage < cfg.Threshold {
 		return fmt.Errorf("coverage %.2f is below threshold %.2f", lineCoverage, cfg.Threshold)
 	}
 
@@ -200,15 +201,8 @@ func writeToFile(path string, writeFn func(io.Writer) error) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		closeErr := file.Close()
-		if err == nil && closeErr != nil {
-			err = closeErr
-		}
-	}()
-
-	err = writeFn(file)
-	return err
+	defer func() { err = errors.Join(err, file.Close()) }()
+	return writeFn(file)
 }
 
 func writeVerboseCoverage(stdout io.Writer, report coverage.Report) error {
@@ -277,11 +271,7 @@ func uncoveredLineRefs(file string, uncoveredLines []int) []string {
 	lines := strings.Split(string(content), "\n")
 	refs := make([]string, 0, len(uncoveredLines))
 	for _, lineNumber := range uncoveredLines {
-		source := ""
-		if lineNumber-1 >= 0 && lineNumber-1 < len(lines) {
-			source = strings.TrimSpace(lines[lineNumber-1])
-		}
-		refs = append(refs, fmt.Sprintf("%s:%d %q", file, lineNumber, source))
+		refs = append(refs, fmt.Sprintf("%s:%d %q", file, lineNumber, sourceLine(lines, lineNumber)))
 	}
 	return refs
 }
@@ -308,13 +298,17 @@ func uncoveredBranchRefs(file string, uncoveredBranches []string) []string {
 			refs = append(refs, fmt.Sprintf("%s (%s)", file, branch))
 			continue
 		}
-		source := ""
-		if line-1 >= 0 && line-1 < len(lines) {
-			source = strings.TrimSpace(lines[line-1])
-		}
-		refs = append(refs, fmt.Sprintf("%s:%d %q (%s)", file, line, source, edge))
+		refs = append(refs, fmt.Sprintf("%s:%d %q (%s)", file, line, sourceLine(lines, line), edge))
 	}
 	return refs
+}
+
+// sourceLine returns the trimmed text of a 1-based line, or "" when it is out of range.
+func sourceLine(lines []string, number int) string {
+	if number < 1 || number > len(lines) {
+		return ""
+	}
+	return strings.TrimSpace(lines[number-1])
 }
 
 func parseBranchRef(branch string) (line int, edge string, ok bool) {

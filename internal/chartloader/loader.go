@@ -158,15 +158,17 @@ func loadYAMLMap(path string) (map[string]any, error) {
 
 func mergeInto(dst map[string]any, src map[string]any) {
 	for key, value := range src {
-		existing, exists := dst[key]
 		srcMap, srcIsMap := asStringMap(value)
-		dstMap, dstIsMap := asStringMap(existing)
-		if exists && srcIsMap && dstIsMap {
+		dstMap, dstIsMap := asStringMap(dst[key])
+		switch {
+		case srcIsMap && dstIsMap:
 			mergeInto(dstMap, srcMap)
 			dst[key] = dstMap
-			continue
+		case srcIsMap:
+			dst[key] = deepCopyMap(srcMap)
+		default:
+			dst[key] = value
 		}
-		dst[key] = value
 	}
 }
 
@@ -188,11 +190,10 @@ func setByPath(dst map[string]any, path string, value any) {
 		}
 		nextMap, nextMapOK := asStringMap(next)
 		if !nextMapOK {
-			newMap := map[string]any{}
-			current[part] = newMap
-			current = newMap
-			continue
+			nextMap = map[string]any{}
 		}
+		// asStringMap may return a converted copy, so store what we write into.
+		current[part] = nextMap
 		current = nextMap
 	}
 }
@@ -214,13 +215,10 @@ func asStringMap(value any) (map[string]any, bool) {
 	case map[string]any:
 		return typed, true
 	case map[any]any:
-		out := map[string]any{}
+		// YAML decodes maps with non-string keys this way; Helm stringifies the keys.
+		out := make(map[string]any, len(typed))
 		for key, val := range typed {
-			keyString, ok := key.(string)
-			if !ok {
-				return nil, false
-			}
-			out[keyString] = val
+			out[fmt.Sprint(key)] = val
 		}
 		return out, true
 	default:
