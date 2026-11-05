@@ -1,8 +1,3 @@
----
-name: golang-dev
-description: Build and maintain helmcov in Go with strict TDD, SOLID package boundaries, deterministic coverage behavior, and release-ready binary/docker workflows. Use when adding Go features, tests, CI, packaging, or coverage/reporting logic.
----
-
 # Helmcov Go Development
 
 ## Core Workflow
