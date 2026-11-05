@@ -61,8 +61,8 @@ tests:
 			name:      "layers a values file relative to the suite",
 			templates: []string{"templates/b.yaml"},
 			values: map[string]any{
-				"mode": "suite-set", "replicas": 2, "nested": map[string]any{"a": 1, "b": 2},
-				"list": []any{map[string]any{"b": 1}, map[string]any{"b": 2}}, "gone": "here",
+				"mode": "suite-set", "replicas": 2, "nested": map[string]any{"a": 1.0, "b": 2.0},
+				"list": []any{map[string]any{"b": 1.0}, map[string]any{"b": 2.0}}, "gone": "here",
 			},
 		},
 		{
@@ -70,7 +70,7 @@ tests:
 			name:      "layers set paths in key order",
 			templates: []string{"templates/a.yaml"},
 			values: map[string]any{
-				"mode": "suite-set", "replicas": 2, "nested": map[string]any{"a": 1, "c": 3},
+				"mode": "suite-set", "replicas": 2, "nested": map[string]any{"a": 1.0, "c": 3},
 				"list": []any{nil, map[string]any{"b": 5}},
 			},
 		},
@@ -106,10 +106,11 @@ func TestLoadBundleReportsMissingTestValuesFile(t *testing.T) {
 	}
 }
 
+// Values files decode numbers as float64, as Helm does; set values from the suite stay int.
 func suiteValues() map[string]any {
 	return map[string]any{
-		"mode": "suite-set", "replicas": 2, "nested": map[string]any{"a": 1},
-		"list": []any{map[string]any{"b": 1}, map[string]any{"b": 2}}, "gone": "here",
+		"mode": "suite-set", "replicas": 2, "nested": map[string]any{"a": 1.0},
+		"list": []any{map[string]any{"b": 1.0}, map[string]any{"b": 2.0}}, "gone": "here",
 	}
 }
 

@@ -1,173 +1,298 @@
 package chartloader
 
 import (
+	"bytes"
+	"encoding/base64"
+	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
+	"regexp"
 	"strings"
+
+	"sigs.k8s.io/yaml"
 )
 
-type ChartFiles struct {
-	files map[string][]byte
+// ChartFiles is the chart's .Files: every file except Chart.yaml, values files,
+// templates/ and charts/, keyed by its path from the chart root. It is a map
+// type, as in Helm, so templates can range over it.
+type ChartFiles map[string][]byte
+
+// Files Helm loads into other parts of the chart rather than .Files.
+var specialChartFiles = map[string]bool{
+	"Chart.yaml": true, "Chart.lock": true, "values.yaml": true, "values.schema.json": true,
+	"requirements.yaml": true, "requirements.lock": true,
 }
 
-func (f ChartFiles) WithFile(name string, content []byte) ChartFiles {
-	cloned := map[string][]byte{}
-	for key, value := range f.files {
-		cloned[key] = value
-	}
-	cloned[name] = content
-	return ChartFiles{files: cloned}
-}
-
+// LoadChartFiles reads .Files the way Helm does: it follows symlinks, strips a
+// UTF-8 BOM and honours .helmignore.
 func LoadChartFiles(chartPath string) (ChartFiles, error) {
-	filesDir := filepath.Join(chartPath, "files")
-	info, err := os.Stat(filesDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return ChartFiles{files: map[string][]byte{}}, nil
-		}
-		return ChartFiles{}, fmt.Errorf("stat chart files dir: %w", err)
-	}
-	if !info.IsDir() {
-		return ChartFiles{}, fmt.Errorf("chart files path is not a directory: %s", filesDir)
-	}
-
-	loaded := map[string][]byte{}
-	err = filepath.WalkDir(filesDir, func(filePath string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		content, readErr := os.ReadFile(filePath)
-		if readErr != nil {
-			return fmt.Errorf("read chart file %s: %w", filePath, readErr)
-		}
-		rel, relErr := filepath.Rel(filesDir, filePath)
-		if relErr != nil {
-			return relErr
-		}
-		loaded[filepath.ToSlash(rel)] = content
-		return nil
-	})
-	if err != nil {
-		return ChartFiles{}, fmt.Errorf("load chart files: %w", err)
-	}
-
-	return ChartFiles{files: loaded}, nil
-}
-
-func (f ChartFiles) Get(name string) (string, error) {
-	content, err := f.GetBytes(name)
-	if err != nil {
-		return "", err
-	}
-	return string(content), nil
-}
-
-func (f ChartFiles) GetBytes(name string) ([]byte, error) {
-	key := normalizeChartFilePath(name)
-	content, ok := f.files[key]
-	if !ok {
-		return nil, fmt.Errorf("files: %q not found", name)
-	}
-	cloned := make([]byte, len(content))
-	copy(cloned, content)
-	return cloned, nil
-}
-
-func (f ChartFiles) Glob(pattern string) ([]string, error) {
-	matches := make([]string, 0)
-	for name := range f.files {
-		matched, err := matchChartFileGlob(pattern, name)
-		if err != nil {
-			return nil, err
-		}
-		if matched {
-			matches = append(matches, name)
-		}
-	}
-	sort.Strings(matches)
-	return matches, nil
-}
-
-func (f ChartFiles) Lines(name string) ([]string, error) {
-	content, err := f.Get(name)
+	ignore, err := loadHelmignore(filepath.Join(chartPath, ".helmignore"))
 	if err != nil {
 		return nil, err
 	}
-	if content == "" {
-		return []string{}, nil
+	if ignore.ignores("Chart.yaml", false) {
+		return nil, errors.New(".helmignore excludes Chart.yaml, so Helm cannot load this chart")
 	}
-	return strings.Split(content, "\n"), nil
+	root, err := filepath.EvalSymlinks(chartPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve chart path: %w", err)
+	}
+	files := ChartFiles{}
+	if err := files.load(chartPath, "", root, ignore, map[string]bool{}); err != nil {
+		return nil, fmt.Errorf("load chart files: %w", err)
+	}
+	return files, nil
 }
 
-func (f ChartFiles) AsConfig() (string, error) {
-	return f.renderFileBundle(false)
+func insideRoot(link, root string) bool {
+	target, err := filepath.EvalSymlinks(link)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(root, target)
+	return err == nil && (rel == "." || filepath.IsLocal(rel))
 }
 
-func (f ChartFiles) AsSecrets() (string, error) {
-	return f.renderFileBundle(true)
-}
+var utf8BOM = []byte("\xef\xbb\xbf")
 
-func (f ChartFiles) renderFileBundle(secrets bool) (string, error) {
-	if len(f.files) == 0 {
-		return "", nil
+func (f ChartFiles) load(dir, prefix, root string, ignore helmignore, seen map[string]bool) error {
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
 	}
-
-	names := make([]string, 0, len(f.files))
-	for name := range f.files {
-		names = append(names, name)
+	// Only a directory that contains itself is a loop; other repeats are separate paths in Helm too.
+	if seen[resolved] {
+		return nil
 	}
-	sort.Strings(names)
-
-	var builder strings.Builder
-	for _, name := range names {
-		content := string(f.files[name])
-		if secrets {
-			fmt.Fprintf(&builder, "%s: %q\n", name, content)
+	seen[resolved] = true
+	defer delete(seen, resolved)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		full := filepath.Join(dir, entry.Name())
+		rel := path.Join(prefix, entry.Name())
+		// Helm follows links anywhere; helmcov skips ones that leave the chart, so a chart
+		// from an untrusted PR cannot read runner files such as credentials into .Files.
+		if !insideRoot(full, root) {
 			continue
 		}
-		fmt.Fprintf(&builder, "%s: |\n%s\n", name, indentLines(content, "  "))
+		info, err := os.Stat(full) // follows symlinks, as Helm does
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if rel == "templates" || rel == "charts" || ignore.ignores(rel, true) {
+				continue
+			}
+			if err := f.load(full, rel, root, ignore, seen); err != nil {
+				return err
+			}
+			continue
+		}
+		if specialChartFiles[rel] || ignore.ignores(rel, false) {
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("%s is not a regular file", full)
+		}
+		content, err := os.ReadFile(full)
+		if err != nil {
+			return err
+		}
+		f[rel] = bytes.TrimPrefix(content, utf8BOM)
 	}
-	return strings.TrimSuffix(builder.String(), "\n"), nil
+	return nil
 }
 
-func normalizeChartFilePath(name string) string {
-	return filepath.ToSlash(strings.TrimPrefix(strings.ReplaceAll(name, "\\", "/"), "./"))
+// GetBytes returns a file's contents, or nothing when it does not exist.
+func (f ChartFiles) GetBytes(name string) []byte {
+	if content, ok := f[name]; ok {
+		return content
+	}
+	return []byte{}
 }
 
-func matchChartFileGlob(pattern, name string) (bool, error) {
-	pattern = normalizeChartFilePath(pattern)
-	name = normalizeChartFilePath(name)
-
-	if ok, err := path.Match(pattern, name); err != nil {
-		return false, err
-	} else if ok {
-		return true, nil
-	}
-
-	if strings.HasSuffix(pattern, "/**") {
-		prefix := strings.TrimSuffix(pattern, "/**")
-		return name == prefix || strings.HasPrefix(name, prefix+"/"), nil
-	}
-	// path.Match already handled direct children, so only the directory itself is left.
-	if strings.HasSuffix(pattern, "/*") {
-		return name == strings.TrimSuffix(pattern, "/*"), nil
-	}
-
-	return false, nil
+// Get returns a file's contents as a string, or "" when it does not exist.
+func (f ChartFiles) Get(name string) string {
+	return string(f.GetBytes(name))
 }
 
-func indentLines(content, prefix string) string {
-	lines := strings.Split(content, "\n")
-	for index, line := range lines {
-		lines[index] = prefix + line
+// Glob returns the files matching pattern. An invalid pattern matches every file, as in Helm.
+func (f ChartFiles) Glob(pattern string) ChartFiles {
+	match, err := compileGlob(pattern)
+	if err != nil {
+		match = regexp.MustCompile(".*")
 	}
-	return strings.Join(lines, "\n")
+	matched := ChartFiles{}
+	for name, content := range f {
+		if match.MatchString(name) {
+			matched[name] = content
+		}
+	}
+	return matched
+}
+
+// Lines splits a file into lines, without an empty line for a trailing newline.
+func (f ChartFiles) Lines(name string) []string {
+	content := string(f[name])
+	if content == "" {
+		return []string{}
+	}
+	return strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+}
+
+// AsConfig renders the files as ConfigMap data, keyed by base name.
+func (f ChartFiles) AsConfig() string {
+	return f.asMap(func(content []byte) string { return string(content) })
+}
+
+// AsSecrets renders the files as Secret data: base64 values keyed by base name.
+func (f ChartFiles) AsSecrets() string {
+	return f.asMap(base64.StdEncoding.EncodeToString)
+}
+
+func (f ChartFiles) asMap(value func([]byte) string) string {
+	if len(f) == 0 {
+		return ""
+	}
+	m := make(map[string]string, len(f))
+	for name, content := range f {
+		m[path.Base(name)] = value(content)
+	}
+	data, err := yaml.Marshal(m)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSuffix(string(data), "\n")
+}
+
+// globToken splits a glob into **, an escape, a [class], a single special
+// character, or a run of literal text.
+var globToken = regexp.MustCompile(`\*\*|\\.?|\[[^\]]*\]|[*?{},\[]|[^*?{},\[\\]+`)
+
+// compileGlob converts a Helm glob (gobwas/glob with '/' as the separator) to a
+// regexp: ** crosses directories, * and ? do not, and {a,b} picks one alternative.
+func compileGlob(pattern string) (*regexp.Regexp, error) {
+	var b strings.Builder
+	b.WriteString("^")
+	depth := 0
+	for _, tok := range globToken.FindAllString(pattern, -1) {
+		switch {
+		case tok == "**":
+			b.WriteString(".*")
+		case tok == "*":
+			b.WriteString("[^/]*")
+		case tok == "?":
+			b.WriteString("[^/]")
+		case tok == "{":
+			depth++
+			b.WriteString("(?:")
+		case tok == "}":
+			if depth == 0 {
+				return nil, fmt.Errorf("unmatched } in %q", pattern)
+			}
+			depth--
+			b.WriteString(")")
+		case tok == ",":
+			b.WriteString(map[bool]string{true: "|", false: ","}[depth > 0])
+		case tok == "[":
+			return nil, fmt.Errorf("unmatched [ in %q", pattern)
+		case strings.HasPrefix(tok, "["):
+			class := tok[1 : len(tok)-1]
+			if strings.HasPrefix(class, "!") {
+				class = "^" + class[1:]
+			} else if strings.HasPrefix(class, "^") {
+				class = `\^` + class[1:] // gobwas treats ^ literally
+			}
+			b.WriteString("[" + class + "]")
+		case tok == `\`:
+			return nil, fmt.Errorf("trailing backslash in %q", pattern)
+		case strings.HasPrefix(tok, `\`):
+			b.WriteString(regexp.QuoteMeta(tok[1:]))
+		default:
+			b.WriteString(regexp.QuoteMeta(tok))
+		}
+	}
+	if depth != 0 {
+		return nil, fmt.Errorf("unmatched { in %q", pattern)
+	}
+	b.WriteString("$")
+	return regexp.Compile(b.String())
+}
+
+type helmignore []ignoreRule
+
+type ignoreRule struct {
+	pattern  string
+	negate   bool
+	dirOnly  bool
+	fullPath bool
+}
+
+// loadHelmignore parses .helmignore with Helm's rules: ** and malformed globs
+// are errors, a trailing / matches directories, a leading / or any / matches
+// the path from the chart root, and other rules match the base name.
+func loadHelmignore(file string) (helmignore, error) {
+	data, err := os.ReadFile(file)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read .helmignore: %w", err)
+	}
+	var rules helmignore
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.Contains(line, "**") {
+			return nil, fmt.Errorf(".helmignore rule %q: ** is not supported by Helm", line)
+		}
+		if _, err := path.Match(line, "abc"); err != nil {
+			return nil, fmt.Errorf(".helmignore rule %q: %w", line, err)
+		}
+		rule := ignoreRule{}
+		if strings.HasPrefix(line, "!") {
+			rule.negate = true
+			line = line[1:]
+		}
+		if strings.HasSuffix(line, "/") {
+			rule.dirOnly = true
+			line = strings.TrimSuffix(line, "/")
+		}
+		rule.fullPath = strings.Contains(line, "/")
+		rule.pattern = strings.TrimPrefix(line, "/")
+		rules = append(rules, rule)
+	}
+	return rules, nil
+}
+
+// ignores copies Helm's Rules.Ignore, including how a negated rule ignores
+// every path it does not match.
+func (h helmignore) ignores(rel string, isDir bool) bool {
+	for _, rule := range h {
+		target := rel
+		if !rule.fullPath {
+			target = path.Base(rel)
+		}
+		matched, _ := path.Match(rule.pattern, target)
+		if rule.negate {
+			if (rule.dirOnly && !isDir) || !matched {
+				return true
+			}
+			continue
+		}
+		if rule.dirOnly && !isDir {
+			continue
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }

@@ -68,7 +68,7 @@ func TestHelmRenderValuesBuildsChartAndReleaseContext(t *testing.T) {
 		ChartPath:    "/tmp/chart",
 		TemplatePath: "/tmp/chart/templates/hyperdx/configmap.yaml",
 		KubeVersion:  "1.29.0",
-		Files:        ChartFiles{}.WithFile("config.txt", []byte("demo")),
+		Files:        ChartFiles{"config.txt": []byte("demo")},
 	})
 
 	chart, ok := values["Chart"].(map[string]any)
@@ -110,7 +110,7 @@ func TestHelmRenderValuesBuildsChartAndReleaseContext(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected Files object")
 	}
-	if content, err := files.Get("config.txt"); err != nil || content != "demo" {
-		t.Fatalf("expected chart file content, got %q err=%v", content, err)
+	if content := files.Get("config.txt"); content != "demo" {
+		t.Fatalf("expected chart file content, got %q", content)
 	}
 }

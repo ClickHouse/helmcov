@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yaml
+data:
+  nested: |
+    {{- toYaml .Values.nested | nindent 4 }}
+  json: {{ toJson .Values.nested | quote }}
+  text: {{ .Values.text | quote }}
+  roundTrip: {{ (fromYaml (toYaml .Values.nested)).map.key | quote }}
+  flagOff: {{ if .Values.flagOff }}"truthy"{{ else }}"falsy"{{ end }}
+  bigNumber: {{ .Values.bigNumber | quote }}
+  date: {{ .Values.date | quote }}
+  dateYaml: {{ toYaml .Values.date | quote }}

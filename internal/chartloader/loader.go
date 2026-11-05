@@ -14,10 +14,13 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+	sigsyaml "sigs.k8s.io/yaml"
 )
 
 type Bundle struct {
-	Chart  ChartMeta
+	Chart ChartMeta
+	// Values is the chart's values.yaml, before any suite or test changes it.
+	Values map[string]any
 	Suites []Suite
 }
 
@@ -126,6 +129,7 @@ func LoadBundle(chartPath, testsPath string) (Bundle, error) {
 	if chartValues == nil {
 		chartValues = map[string]any{}
 	}
+	bundle.Values = deepCopyMap(chartValues)
 
 	suitePaths, err := DiscoverSuites(testsPath)
 	if err != nil {
@@ -234,8 +238,10 @@ func loadYAMLMap(path string) (map[string]any, error) {
 	if len(data) == 0 {
 		return map[string]any{}, nil
 	}
+	// Helm reads values with sigs.k8s.io/yaml: YAML 1.1 booleans such as "off",
+	// numbers as float64, and string keys only.
 	var result map[string]any
-	if err := yaml.Unmarshal(data, &result); err != nil {
+	if err := sigsyaml.Unmarshal(data, &result); err != nil {
 		return nil, err
 	}
 	if result == nil {

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: files
+data:
+  get: {{ .Files.Get "files/a.txt" | quote }}
+  getWithoutPrefix: {{ .Files.Get "a.txt" | quote }}
+  ignored: {{ .Files.Get "files/ignored.skip" | quote }}
+  readme: {{ .Files.Get "README.md" | quote }}
+  lines: {{ .Files.Lines "files/a.txt" | toJson | quote }}
+  glob: "{{ range $path, $_ := .Files.Glob "files/*" }}{{ $path }},{{ end }}"
+  globDeep: "{{ range $path, $_ := .Files.Glob "files/**" }}{{ $path }},{{ end }}"
+  all: "{{ range $path, $_ := .Files }}{{ $path }},{{ end }}"
+  {{- (.Files.Glob "files/conf/*").AsConfig | nindent 2 }}

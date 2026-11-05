@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	yamlv3 "gopkg.in/yaml.v3"
+	"sigs.k8s.io/yaml"
 )
+
+// Helm's toYaml and fromYaml go through sigs.k8s.io/yaml; only toYamlPretty uses yaml.v3.
 
 func fromYAML(str string) map[string]any {
 	result := map[string]any{}
@@ -58,7 +61,7 @@ func mustToJSON(value any) (string, error) {
 
 func toYAMLPretty(value any) string {
 	var buffer bytes.Buffer
-	encoder := yaml.NewEncoder(&buffer)
+	encoder := yamlv3.NewEncoder(&buffer)
 	encoder.SetIndent(2)
 	if err := encoder.Encode(value); err != nil {
 		return ""

@@ -35,64 +35,6 @@ func TestIsPackagedSubchartTemplate(t *testing.T) {
 	}
 }
 
-func TestMatchChartFileGlob(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		pattern, name string
-		want          bool
-	}{
-		{"files/*.txt", "files/a.txt", true},
-		{"./files/*", "files/a.txt", true},
-		{"files/*", "files", true},
-		{"files/*", "files/sub/a.txt", false},
-		{"files/*", "other/a.txt", false},
-		{"files/**", "files", true},
-		{"files/**", "files/sub/a.txt", true},
-		{"files/**", "filesystem/a.txt", false},
-		{`files\*.txt`, "files/a.txt", true},
-		{"*.txt", "files/a.txt", false},
-	}
-	for _, tc := range cases {
-		got, err := matchChartFileGlob(tc.pattern, tc.name)
-		if err != nil {
-			t.Fatalf("matchChartFileGlob(%q, %q): %v", tc.pattern, tc.name, err)
-		}
-		if got != tc.want {
-			t.Errorf("matchChartFileGlob(%q, %q) = %v, want %v", tc.pattern, tc.name, got, tc.want)
-		}
-	}
-	if _, err := matchChartFileGlob("files/[", "files/a"); err == nil {
-		t.Error("want an error for a malformed pattern")
-	}
-}
-
-func TestChartFilesLinesAndAsSecrets(t *testing.T) {
-	t.Parallel()
-
-	files := ChartFiles{}.WithFile("b.txt", []byte("x\ny")).WithFile("a.txt", []byte(""))
-
-	if got, err := files.Lines("b.txt"); err != nil || !reflect.DeepEqual(got, []string{"x", "y"}) {
-		t.Errorf("Lines(b.txt) = %v, %v", got, err)
-	}
-	if got, err := files.Lines("a.txt"); err != nil || len(got) != 0 {
-		t.Errorf("Lines(a.txt) = %#v, %v; want empty", got, err)
-	}
-	if _, err := files.Lines("missing.txt"); err == nil {
-		t.Error("Lines(missing) should fail")
-	}
-	got, err := files.AsSecrets()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := "a.txt: \"\"\nb.txt: \"x\\ny\""; got != want {
-		t.Errorf("AsSecrets() = %q, want %q", got, want)
-	}
-	if empty, _ := (ChartFiles{}).AsSecrets(); empty != "" {
-		t.Errorf("AsSecrets() on no files = %q, want empty", empty)
-	}
-}
-
 func TestLoadBundleAppliesSetPaths(t *testing.T) {
 	t.Parallel()
 

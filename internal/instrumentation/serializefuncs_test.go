@@ -106,7 +106,7 @@ func TestRenderAndTraceSupportsFilesGet(t *testing.T) {
 	exec := NewExecutor()
 	main := `{{ .Files.Get "config.txt" }}`
 	values := map[string]any{
-		"Files": chartloader.ChartFiles{}.WithFile("config.txt", []byte("enabled")),
+		"Files": chartloader.ChartFiles{"config.txt": []byte("enabled")},
 	}
 
 	_, rendered, err := exec.RenderAndTrace("files.yaml", main, values, nil)
