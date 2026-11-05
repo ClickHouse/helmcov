@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help setup hooks tidy tidy-check fmt fmt-check lint test cover integration-test build ci release-check
+.PHONY: help setup hooks tidy tidy-check fmt fmt-check lint test cover integration-test e2e build ci release-check
 
 help:
 	@echo "Targets:"
@@ -14,8 +14,9 @@ help:
 	@echo "  make test             # run all Go tests"
 	@echo "  make cover            # run tests with race detector and coverage, fail under 70%"
 	@echo "  make integration-test # run integration-oriented CLI tests"
+	@echo "  make e2e              # build the binary and run it against e2e/testdata charts"
 	@echo "  make build            # build CLI binary"
-	@echo "  make ci               # tidy-check + fmt-check + lint + cover + integration-test + build"
+	@echo "  make ci               # tidy-check + fmt-check + lint + cover + integration-test + e2e + build"
 	@echo "  make release-check    # ci + goreleaser config validation (if installed)"
 
 setup: hooks tidy
@@ -60,10 +61,13 @@ cover:
 integration-test:
 	go test ./internal/cli -run 'TestRunAgainstExamples|TestRunAgainstMonorepoExamples' -count=1 -v
 
+e2e:
+	go test ./e2e -count=1 -v
+
 build:
 	go build ./cmd/helmcov
 
-ci: tidy-check fmt-check lint cover integration-test build
+ci: tidy-check fmt-check lint cover integration-test e2e build
 
 release-check: ci
 	@if command -v goreleaser >/dev/null 2>&1; then \

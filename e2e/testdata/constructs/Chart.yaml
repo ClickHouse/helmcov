@@ -1,0 +1,5 @@
+apiVersion: v2
+name: constructs
+description: One template per template construct helmcov traces; used by the e2e tests.
+type: application
+version: 0.1.0

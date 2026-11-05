@@ -1,0 +1,16 @@
+suite: prod
+templates:
+  - templates/conditionals.yaml
+  - templates/scopes.yaml
+set:
+  mode: prod
+  debug: true
+  replicas: 3
+  featureB: true
+tests:
+  - it: renders with production values
+    template: templates/conditionals.yaml
+    asserts:
+      - equal:
+          path: data.mode
+          value: production
