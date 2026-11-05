@@ -110,6 +110,9 @@ type renderJob struct {
 	template string
 	values   map[string]any
 	context  chartloader.UnittestContext
+	// test is true for a helm-unittest test's own values, which render as Helm would.
+	test       bool
+	expectFail bool
 }
 
 // suiteRenders renders the suite's templates with its values and the generated
@@ -124,7 +127,7 @@ func suiteRenders(suite chartloader.Suite, cfg Config) []renderJob {
 	}
 	for _, test := range suite.Tests {
 		for _, template := range test.TemplatesIn(suite) {
-			jobs = append(jobs, renderJob{template: template, values: test.MergedValues, context: test.ContextIn(suite)})
+			jobs = append(jobs, renderJob{template: template, values: test.MergedValues, context: test.ContextIn(suite), test: true, expectFail: test.ExpectsRenderFailure()})
 		}
 	}
 	return jobs
@@ -154,7 +157,7 @@ func (c chartRenderer) trace(job renderJob) (instrumentation.Trace, bool, error)
 	meta := c.meta
 	meta.Version = cmp.Or(job.context.ChartVersion, meta.Version)
 	meta.AppVersion = cmp.Or(job.context.ChartAppVersion, meta.AppVersion)
-	exec := instrumentation.Executor{Lookup: job.context.Lookup}
+	exec := instrumentation.Executor{Lookup: job.context.Lookup, Strict: job.test}
 	trace, _, err := exec.RenderAndTrace(src.file, src.content, chartloader.HelmRenderValues(chartloader.RenderOptions{
 		Chart:        meta,
 		Values:       job.values,
@@ -166,6 +169,10 @@ func (c chartRenderer) trace(job renderJob) (instrumentation.Trace, bool, error)
 		APIVersions:  job.context.APIVersions,
 	}), c.templates)
 	if err != nil {
+		// A test that asserts failedTemplate expects this; the lines run before the failure still count.
+		if job.expectFail && errors.Is(err, instrumentation.ErrExecute) {
+			return trace, true, nil
+		}
 		return instrumentation.Trace{}, false, fmt.Errorf("render template %s: %w", templatePath, err)
 	}
 	return trace, true, nil

@@ -57,7 +57,18 @@ type Test struct {
 	Capabilities capabilities       `yaml:"capabilities"`
 	ChartMeta    chartOverride      `yaml:"chart"`
 	Provider     kubernetesProvider `yaml:"kubernetesProvider"`
+	Asserts      []map[string]any   `yaml:"asserts"`
 	MergedValues map[string]any     `yaml:"-"`
+}
+
+// ExpectsRenderFailure reports whether the test asserts that rendering fails.
+func (t Test) ExpectsRenderFailure() bool {
+	for _, assert := range t.Asserts {
+		if _, ok := assert["failedTemplate"]; ok && assert["not"] != true {
+			return true
+		}
+	}
+	return false
 }
 
 // TemplatesIn returns the templates the test renders: its own selection, or the suite's.

@@ -369,3 +369,56 @@ func writeTestFile(t *testing.T, path, content string) {
 		t.Fatalf("write %s: %v", path, err)
 	}
 }
+
+func TestRunTestRenderFailures(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		asserts string
+		wantErr bool
+	}{
+		{name: "failedTemplate assert keeps lines before the failure", asserts: "      - failedTemplate:\n          errorMessage: items must be a list\n"},
+		{name: "unexpected failure aborts", asserts: "      - hasDocuments:\n          count: 1\n", wantErr: true},
+		{name: "negated failedTemplate aborts", asserts: "      - failedTemplate: {}\n        not: true\n", wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			base := t.TempDir()
+			chartDir := filepath.Join(base, "chart")
+			testsDir := filepath.Join(base, "tests")
+			writeTestFile(t, filepath.Join(chartDir, "Chart.yaml"), "apiVersion: v2\nname: demo\nversion: 0.1.0\n")
+			writeTestFile(t, filepath.Join(chartDir, "values.yaml"), "items: []\n")
+			// Charts often validate input with fail before ranging over it.
+			writeTestFile(t, filepath.Join(chartDir, "templates", "configmap.yaml"),
+				"{{- if not (kindIs \"slice\" .Values.items) }}\n{{- fail \"items must be a list\" }}\n{{- end }}\n{{- range .Values.items }}\n- {{ . }}\n{{- end }}\n")
+			writeTestFile(t, filepath.Join(testsDir, "demo_test.yaml"), "suite: guard\ntemplates:\n  - configmap.yaml\ntests:\n"+
+				"  - it: renders with items set to a string\n    set:\n      items: ALL\n    asserts:\n"+tc.asserts)
+			goOut := filepath.Join(base, "coverage.out")
+
+			var out bytes.Buffer
+			err := Run([]string{"--chart", chartDir, "--tests", testsDir, "--format", "go", "--go-coverprofile", goOut, "--max-scenarios", "1"}, &out)
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "items must be a list") {
+					t.Fatalf("expected the render error, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected run error: %v", err)
+			}
+			profile, err := os.ReadFile(goOut)
+			if err != nil {
+				t.Fatalf("read coverprofile: %v", err)
+			}
+			file := filepath.Join(chartDir, "templates", "configmap.yaml")
+			for _, want := range []string{file + ":2.1,2.1 1 1\n", file + ":5.1,5.1 1 0\n"} {
+				if !strings.Contains(string(profile), want) {
+					t.Fatalf("expected %q in coverprofile, got:\n%s", want, profile)
+				}
+			}
+		})
+	}
+}

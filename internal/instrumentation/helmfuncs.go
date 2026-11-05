@@ -2,6 +2,7 @@ package instrumentation
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"maps"
@@ -15,9 +16,9 @@ import (
 const recursionMaxNums = 1000
 
 // bindHelmTemplateFuncs gives t Helm's function map. Templates cannot read the
-// environment, and required and fail never stop a render, because generated
-// scenarios often leave required values unset.
-func bindHelmTemplateFuncs(t *template.Template, trace *Trace, lookup LookupFunc) {
+// environment. Unless strict, required and fail never stop a render, because
+// generated scenarios often leave required values unset.
+func bindHelmTemplateFuncs(t *template.Template, trace *Trace, lookup LookupFunc, strict bool) {
 	if lookup == nil {
 		lookup = noCluster
 	}
@@ -41,6 +42,10 @@ func bindHelmTemplateFuncs(t *template.Template, trace *Trace, lookup LookupFunc
 		"fail":          func(string) string { return "" },
 		"lookup":        lookup,
 	})
+	if strict {
+		funcMap["fail"] = func(msg string) (string, error) { return "", errors.New(msg) }
+		funcMap["required"] = strictRequired
+	}
 	maps.Copy(funcMap, coverageFuncs(trace))
 	t.Funcs(funcMap)
 }
@@ -119,6 +124,17 @@ func required(_ string, value any) any {
 		return ""
 	}
 	return value
+}
+
+// strictRequired matches Helm's required: nil and empty strings are errors.
+func strictRequired(msg string, value any) (any, error) {
+	if value == nil {
+		return nil, errors.New(msg)
+	}
+	if str, ok := value.(string); ok && str == "" {
+		return nil, errors.New(msg)
+	}
+	return value, nil
 }
 
 func noCluster(string, string, string, string) (map[string]any, error) {
