@@ -300,3 +300,41 @@ tests:
 		t.Errorf("b.yaml's true branch should stay uncovered; the test only renders a.yaml:\n%s", out)
 	}
 }
+
+func TestRunRendersWithHelmUnittestContext(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	chart := filepath.Join(base, "chart")
+	writeTestFile(t, filepath.Join(chart, "Chart.yaml"), "apiVersion: v2\nname: demo\nversion: 0.1.0\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "a.yaml"), "{{- if .Capabilities.APIVersions.Has \"batch/v1\" }}\nbatch: on\n{{- end }}\n{{- if eq .Release.Name \"rel\" }}\nrel: on\n{{- end }}\n"+
+		// helm-unittest's default is Kubernetes 1.20, so only the second test reaches 1.31.
+		"{{- if semverCompare \">=1.25\" .Capabilities.KubeVersion.Version }}\nnew: on\n{{- end }}\n{{- if eq .Chart.Version \"9.9.9\" }}\nchart: on\n{{- end }}\n")
+	writeTestFile(t, filepath.Join(chart, "tests", "t_test.yaml"), `suite: t
+templates: ["*.yaml"]
+tests:
+  - it: uses helm-unittest's defaults
+  - it: declares batch/v1 and a release name
+    capabilities:
+      apiVersions: [batch/v1]
+      majorVersion: 1
+      minorVersion: 31
+    release:
+      name: rel
+    chart:
+      version: 9.9.9
+`)
+
+	var stdout bytes.Buffer
+	err := Run([]string{
+		"--chart", chart, "--tests", filepath.Join(chart, "tests"), "--max-scenarios", "1", "--verbose",
+		"--go-coverprofile", filepath.Join(base, "c.out"), "--cobertura-file", filepath.Join(base, "c.xml"),
+	}, &stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Both branches of each if are taken: the defaults miss them, the second test hits them.
+	if strings.Contains(stdout.String(), "(if:") {
+		t.Errorf("every branch should be covered:\n%s", stdout.String())
+	}
+}

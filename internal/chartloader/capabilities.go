@@ -29,7 +29,11 @@ func DefaultAPIVersions() APIVersionSet {
 	}
 }
 
-func BuildCapabilities(kubeVersion string) map[string]any {
+// BuildCapabilities returns .Capabilities. Nil apiVersions means helm template's defaults.
+func BuildCapabilities(kubeVersion string, apiVersions APIVersionSet) map[string]any {
+	if apiVersions == nil {
+		apiVersions = DefaultAPIVersions()
+	}
 	version := normalizeKubeVersion(kubeVersion)
 	major, minor := kubeMajorMinor(version)
 
@@ -45,7 +49,7 @@ func BuildCapabilities(kubeVersion string) map[string]any {
 			"Compiler":     "gc",
 			"Platform":     "linux/amd64",
 		},
-		"APIVersions": DefaultAPIVersions(),
+		"APIVersions": apiVersions,
 		"HelmVersion": map[string]any{
 			"Version":      "v3.14.0",
 			"GitCommit":    "helmcov",
