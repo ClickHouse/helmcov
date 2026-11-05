@@ -87,3 +87,14 @@ func ResolveTemplatePath(chartPath, templatePath string) (string, error) {
 	}
 	return "", fmt.Errorf("template not found: %s", templatePath)
 }
+
+// IsPackagedSubchartTemplate reports whether templatePath uses helm-unittest's subchart form,
+// charts/<subchart>/templates/<file>, for a subchart that is not unpacked under chartPath.
+func IsPackagedSubchartTemplate(chartPath, templatePath string) bool {
+	parts := strings.Split(filepath.ToSlash(templatePath), "/")
+	if len(parts) < 4 || parts[0] != "charts" || parts[1] == "" || parts[2] != "templates" {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(chartPath, "charts", parts[1]))
+	return err != nil || !info.IsDir()
+}

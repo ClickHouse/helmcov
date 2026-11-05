@@ -289,3 +289,83 @@ func TestRunSupportsChartsRootMonorepoMode(t *testing.T) {
 		t.Fatalf("expected aggregate suite count for monorepo mode, got: %s", out.String())
 	}
 }
+
+func TestRunSubchartTemplatePaths(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		files    map[string]string
+		template string
+		wantErr  bool
+	}{
+		{
+			name:     "packaged subchart template is skipped",
+			files:    map[string]string{"charts/sub-0.1.0.tgz": "not a real archive"},
+			template: "charts/sub/templates/deployment.yaml",
+		},
+		{
+			name:     "missing file in unpacked subchart fails",
+			files:    map[string]string{"charts/sub/Chart.yaml": "apiVersion: v2\nname: sub\nversion: 0.1.0\n"},
+			template: "charts/sub/templates/deployment.yaml",
+			wantErr:  true,
+		},
+		{
+			name:     "path without the templates segment fails",
+			template: "charts/sub/deployment.yaml",
+			wantErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			base := t.TempDir()
+			chartDir := filepath.Join(base, "chart")
+			testsDir := filepath.Join(base, "tests")
+			files := map[string]string{
+				"Chart.yaml":               "apiVersion: v2\nname: demo\nversion: 0.1.0\n",
+				"templates/configmap.yaml": "kind: ConfigMap\n",
+			}
+			for path, content := range tc.files {
+				files[path] = content
+			}
+			for path, content := range files {
+				writeTestFile(t, filepath.Join(chartDir, path), content)
+			}
+			writeTestFile(t, filepath.Join(testsDir, "demo_test.yaml"),
+				"suite: smoke\ntemplates:\n  - configmap.yaml\n  - "+tc.template+"\n")
+			goOut := filepath.Join(base, "coverage.out")
+
+			var out bytes.Buffer
+			err := Run([]string{"--chart", chartDir, "--tests", testsDir, "--format", "go", "--go-coverprofile", goOut}, &out)
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "template not found") {
+					t.Fatalf("expected template not found error, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected run error: %v", err)
+			}
+			profile, err := os.ReadFile(goOut)
+			if err != nil {
+				t.Fatalf("read coverprofile: %v", err)
+			}
+			want := "mode: count\n" + filepath.Join(chartDir, "templates", "configmap.yaml") + ":1.1,1.1 1 1\n"
+			if string(profile) != want {
+				t.Fatalf("expected only the chart's own template in coverage\nwant:\n%s\ngot:\n%s", want, profile)
+			}
+		})
+	}
+}
+
+func writeTestFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}

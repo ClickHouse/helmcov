@@ -52,6 +52,10 @@ func Run(args []string, stdout io.Writer) error {
 			for _, templatePath := range suite.Templates {
 				templateFile, resolveErr := chartloader.ResolveTemplatePath(target.ChartPath, templatePath)
 				if resolveErr != nil {
+					// A packaged dependency's templates sit inside its .tgz and are not this chart's source.
+					if chartloader.IsPackagedSubchartTemplate(target.ChartPath, templatePath) {
+						continue
+					}
 					return fmt.Errorf("resolve template %s: %w", templatePath, resolveErr)
 				}
 				content, readErr := os.ReadFile(templateFile)
