@@ -2,6 +2,7 @@ package chartloader
 
 import (
 	"cmp"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -20,6 +21,100 @@ type UnittestContext struct {
 	APIVersions     APIVersionSet
 	ChartVersion    string
 	ChartAppVersion string
+	// objects, registered and clusterScoped come from kubernetesProvider and answer Lookup.
+	objects       []map[string]any
+	registered    map[string]bool
+	clusterScoped map[string]bool
+}
+
+type kubernetesProvider struct {
+	Scheme map[string]struct {
+		Namespaced *bool `yaml:"namespaced"`
+	} `yaml:"scheme"`
+	Objects []map[string]any `yaml:"objects"`
+}
+
+// withProviders adds each provider's objects in order and records the kinds
+// its scheme registers, and which of those are cluster-scoped.
+func (c UnittestContext) withProviders(providers ...kubernetesProvider) UnittestContext {
+	for _, p := range providers {
+		c.objects = append(c.objects, p.Objects...)
+		for kind, entry := range p.Scheme {
+			c.registered = setKey(c.registered, kind)
+			if entry.Namespaced != nil && !*entry.Namespaced {
+				c.clusterScoped = setKey(c.clusterScoped, kind)
+			}
+		}
+	}
+	return c
+}
+
+func setKey(set map[string]bool, key string) map[string]bool {
+	if set == nil {
+		set = map[string]bool{}
+	}
+	set[key] = true
+	return set
+}
+
+// Lookup answers Helm's lookup from the kubernetesProvider objects, as
+// helm-unittest's fake client does. Only kinds in the scheme are found: a named
+// object or an empty map, or with an empty name a <Kind>List of every match
+// sorted by namespace and name. An empty namespace lists all namespaces, and
+// cluster-scoped kinds ignore the namespace. Results are copies, so a template
+// that changes one cannot affect the next render.
+func (c UnittestContext) Lookup(apiVersion, kind, namespace, name string) (map[string]any, error) {
+	key := apiVersion + "/" + kind
+	if !c.registered[key] {
+		return map[string]any{}, nil
+	}
+	clusterScoped := c.clusterScoped[key]
+	items := []any{}
+	for _, obj := range c.objects {
+		meta, _ := obj["metadata"].(map[string]any)
+		objNamespace, _ := meta["namespace"].(string)
+		if obj["apiVersion"] != apiVersion || obj["kind"] != kind {
+			continue
+		}
+		if !clusterScoped && objNamespace != namespace && (name != "" || namespace != "") {
+			continue
+		}
+		if name == "" {
+			items = append(items, copyObject(obj))
+		} else if meta["name"] == name {
+			return copyObject(obj), nil
+		}
+	}
+	if name != "" {
+		return map[string]any{}, nil
+	}
+	slices.SortFunc(items, func(a, b any) int {
+		return cmp.Compare(objectKey(a), objectKey(b))
+	})
+	return map[string]any{
+		"apiVersion": apiVersion, "kind": kind + "List", "items": items,
+		"metadata": map[string]any{"continue": "", "resourceVersion": ""},
+	}, nil
+}
+
+func objectKey(obj any) string {
+	meta, _ := obj.(map[string]any)["metadata"].(map[string]any)
+	namespace, _ := meta["namespace"].(string)
+	name, _ := meta["name"].(string)
+	return namespace + "/" + name
+}
+
+// copyObject deep-copies an object through JSON.
+func copyObject(obj map[string]any) map[string]any {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return map[string]any{}
+	}
+	var out map[string]any
+	if err := json.Unmarshal(data, &out); err != nil {
+		return map[string]any{}
+	}
+	return out
 }
 
 type releaseSpec struct {
@@ -52,7 +147,7 @@ type chartOverride struct {
 
 // Context is the suite's render context on top of helm-unittest's defaults.
 func (s Suite) Context() UnittestContext {
-	ctx := unittestContext([]releaseSpec{s.Release}, []capabilities{s.Capabilities}, []chartOverride{s.ChartMeta})
+	ctx := unittestContext([]releaseSpec{s.Release}, []capabilities{s.Capabilities}, []chartOverride{s.ChartMeta}).withProviders(s.Provider)
 	items, _ := s.Capabilities.apiVersions()
 	ctx.APIVersions = append(APIVersionSet{}, items...)
 	return ctx
@@ -62,7 +157,8 @@ func (s Suite) Context() UnittestContext {
 // sets to a non-zero value overrides the suite's, and its API versions come
 // before the suite's unless it sets apiVersions to null.
 func (t Test) ContextIn(suite Suite) UnittestContext {
-	ctx := unittestContext([]releaseSpec{suite.Release, t.Release}, []capabilities{suite.Capabilities, t.Capabilities}, []chartOverride{suite.ChartMeta, t.ChartMeta})
+	ctx := unittestContext([]releaseSpec{suite.Release, t.Release}, []capabilities{suite.Capabilities, t.Capabilities}, []chartOverride{suite.ChartMeta, t.ChartMeta}).
+		withProviders(suite.Provider, t.Provider)
 	testItems, null := t.Capabilities.apiVersions()
 	suiteItems, _ := suite.Capabilities.apiVersions()
 	if null {

@@ -338,3 +338,37 @@ tests:
 		t.Errorf("every branch should be covered:\n%s", stdout.String())
 	}
 }
+
+func TestRunAnswersLookupFromKubernetesProvider(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	chart := filepath.Join(base, "chart")
+	writeTestFile(t, filepath.Join(chart, "Chart.yaml"), "apiVersion: v2\nname: demo\nversion: 0.1.0\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "s.yaml"), "{{- if lookup \"v1\" \"Secret\" .Release.Namespace \"existing\" }}\nreuse: true\n{{- else }}\ncreate: true\n{{- end }}\n")
+	writeTestFile(t, filepath.Join(chart, "tests", "t_test.yaml"), `suite: t
+templates: [templates/s.yaml]
+release:
+  namespace: default
+tests:
+  - it: has no cluster objects
+  - it: finds the existing secret
+    kubernetesProvider:
+      scheme:
+        "v1/Secret": {gvr: {version: v1, resource: secrets}, namespaced: true}
+      objects:
+        - {kind: Secret, apiVersion: v1, metadata: {name: existing, namespace: default}}
+`)
+
+	var stdout bytes.Buffer
+	err := Run([]string{
+		"--chart", chart, "--max-scenarios", "1", "--verbose",
+		"--go-coverprofile", filepath.Join(base, "c.out"), "--cobertura-file", filepath.Join(base, "c.xml"),
+	}, &stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stdout.String(), "(if:") {
+		t.Errorf("both lookup branches should be covered:\n%s", stdout.String())
+	}
+}

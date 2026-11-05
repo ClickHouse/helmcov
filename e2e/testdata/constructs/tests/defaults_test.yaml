@@ -17,3 +17,14 @@ tests:
       - equal:
           path: data.mode
           value: staging
+  - it: finds an existing ConfigMap through lookup
+    template: templates/functions.yaml
+    kubernetesProvider:
+      scheme:
+        "v1/ConfigMap": {gvr: {version: v1, resource: configmaps}, namespaced: true}
+      objects:
+        - {kind: ConfigMap, apiVersion: v1, metadata: {name: existing, namespace: NAMESPACE}}
+    asserts:
+      - equal:
+          path: data.existing
+          value: "true"

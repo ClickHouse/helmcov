@@ -31,31 +31,33 @@ type ChartMeta struct {
 }
 
 type Suite struct {
-	Name         string         `yaml:"suite"`
-	Templates    []string       `yaml:"templates"`
-	ValuesFiles  []string       `yaml:"values"`
-	Set          map[string]any `yaml:"set"`
-	Tests        []Test         `yaml:"tests"`
-	Skip         map[string]any `yaml:"skip"`
-	Release      releaseSpec    `yaml:"release"`
-	Capabilities capabilities   `yaml:"capabilities"`
-	ChartMeta    chartOverride  `yaml:"chart"`
+	Name         string             `yaml:"suite"`
+	Templates    []string           `yaml:"templates"`
+	ValuesFiles  []string           `yaml:"values"`
+	Set          map[string]any     `yaml:"set"`
+	Tests        []Test             `yaml:"tests"`
+	Skip         map[string]any     `yaml:"skip"`
+	Release      releaseSpec        `yaml:"release"`
+	Capabilities capabilities       `yaml:"capabilities"`
+	ChartMeta    chartOverride      `yaml:"chart"`
+	Provider     kubernetesProvider `yaml:"kubernetesProvider"`
 	Path         string
 	MergedValues map[string]any
 }
 
 // Test is one helm-unittest test case. Its values and set layer on top of the suite's.
 type Test struct {
-	Name         string         `yaml:"it"`
-	Template     string         `yaml:"template"`
-	Templates    []string       `yaml:"templates"`
-	ValuesFiles  []string       `yaml:"values"`
-	Set          map[string]any `yaml:"set"`
-	Skip         map[string]any `yaml:"skip"`
-	Release      releaseSpec    `yaml:"release"`
-	Capabilities capabilities   `yaml:"capabilities"`
-	ChartMeta    chartOverride  `yaml:"chart"`
-	MergedValues map[string]any `yaml:"-"`
+	Name         string             `yaml:"it"`
+	Template     string             `yaml:"template"`
+	Templates    []string           `yaml:"templates"`
+	ValuesFiles  []string           `yaml:"values"`
+	Set          map[string]any     `yaml:"set"`
+	Skip         map[string]any     `yaml:"skip"`
+	Release      releaseSpec        `yaml:"release"`
+	Capabilities capabilities       `yaml:"capabilities"`
+	ChartMeta    chartOverride      `yaml:"chart"`
+	Provider     kubernetesProvider `yaml:"kubernetesProvider"`
+	MergedValues map[string]any     `yaml:"-"`
 }
 
 // TemplatesIn returns the templates the test renders: its own selection, or the suite's.
