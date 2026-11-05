@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/jordan-simonovski/helmcov/internal/coverage"
+	"github.com/ClickHouse/helmcov/internal/coverage"
 )
 
 type MarkdownOptions struct {

@@ -1,6 +1,6 @@
 # helmcov
 
-[![Release](https://img.shields.io/github/v/release/jordan-simonovski/helmcov)](https://github.com/jordan-simonovski/helmcov/releases)
+[![Release](https://img.shields.io/github/v/release/ClickHouse/helmcov)](https://github.com/ClickHouse/helmcov/releases)
 [![Coverage](https://img.shields.io/badge/coverage-73.8%25-green)](#development-workflow)
 
 Dynamic Helm template coverage for branch-heavy charts.
@@ -138,7 +138,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jordan-simonovski/helmcov@v1
+      - uses: ClickHouse/helmcov@v1
         with:
           chart: charts/my-app
           tests: charts/my-app/tests
@@ -148,7 +148,7 @@ jobs:
 Monorepo mode:
 
 ```yaml
-      - uses: jordan-simonovski/helmcov@v1
+      - uses: ClickHouse/helmcov@v1
         with:
           charts: charts
           threshold: "65"
@@ -232,8 +232,9 @@ with `scripts/validate-conventional-commit.sh`.
 - `.github/workflows/release-please.yml`: maintains semver releases and
   `CHANGELOG.md` using Release Please.
 - `.github/workflows/release.yml`: publishes multi-OS binaries and Docker image
-  through GoReleaser on tag push, then uploads vendored artifacts as a second
-  job in the same workflow using the GoReleaser `dist/` artifact handoff.
+  through GoReleaser when Release Please cuts a release, then uploads vendored
+  artifacts as a second job using the GoReleaser `dist/` artifact handoff. Run
+  it manually with a `tag` input to rebuild an existing release.
 - `.github/workflows/vendor-artifacts.yml`: downloads a tagged release and
   uploads binaries plus image references as reusable artifacts. Manual fallback
   workflow for backfills and retries.
@@ -257,10 +258,6 @@ Tag and image convention is `vX.Y.Z`:
 - Git tag: `vX.Y.Z`
 - GitHub release: `vX.Y.Z`
 - GHCR image: `ghcr.io/<owner>/helmcov:vX.Y.Z` (+ `latest`)
-
-For reliable downstream workflow triggering after Release Please creates tags,
-configure repo secret `RELEASE_PLEASE_TOKEN` (PAT). `GITHUB_TOKEN` can suppress
-tag/release-triggered follow-on workflows.
 
 ## SonarQube integration notes
 
