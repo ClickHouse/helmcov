@@ -93,16 +93,12 @@ func markdownFiles(report coverage.Report, includeTplSources bool) []string {
 	}
 	filtered := make([]string, 0, len(files))
 	for _, file := range files {
-		if isTplSource(file) {
+		if coverage.IsTplSource(file) {
 			continue
 		}
 		filtered = append(filtered, file)
 	}
 	return filtered
-}
-
-func isTplSource(file string) bool {
-	return strings.HasPrefix(file, "tpl:")
 }
 
 func thresholdStatus(lineRate float64, threshold float64) string {

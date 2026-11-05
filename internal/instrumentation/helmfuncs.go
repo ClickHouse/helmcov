@@ -49,6 +49,7 @@ func bindHelmTemplateFuncs(t *template.Template, trace *Trace) {
 	funcMap["tpl"] = tplFun(t, includedNames, trace)
 	funcMap["required"] = requiredFunc(true)
 	funcMap["fail"] = failFunc(true)
+	funcMap[hitFunc] = hitFuncFor(trace)
 	t.Funcs(funcMap)
 }
 
@@ -86,11 +87,8 @@ func tplFun(parent *template.Template, includedNames map[string]int, trace *Trac
 			return "", fmt.Errorf("cannot parse template %q: %w", tpl, err)
 		}
 
-		if trace != nil && parsed.Tree != nil {
-			sourceName := tplSourceName(tpl)
-			registerTemplateLines(sourceName, tpl, trace.Lines)
-			valueMap, _ := vals.(map[string]any)
-			walkTree(parsed.Root, sourceName, cloned, valueMap, tpl, trace)
+		if parsed.Tree != nil {
+			instrumentTree(parsed.Tree, tplSourceName(tpl), tpl, trace)
 		}
 
 		var buf bytes.Buffer

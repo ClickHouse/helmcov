@@ -18,10 +18,19 @@ type FileCoverage struct {
 	Branches map[string]int
 }
 
+// IsTplSource reports whether file is a string rendered through tpl(). Those
+// come from values rather than chart templates, so they are left out of totals.
+func IsTplSource(file string) bool {
+	return strings.HasPrefix(file, "tpl:")
+}
+
 func (r Report) LineRate() float64 {
 	total := 0
 	covered := 0
-	for _, file := range r.Files {
+	for name, file := range r.Files {
+		if IsTplSource(name) {
+			continue
+		}
 		for _, hits := range file.Lines {
 			total++
 			if hits > 0 {
@@ -38,7 +47,10 @@ func (r Report) LineRate() float64 {
 func (r Report) BranchRate() float64 {
 	total := 0
 	covered := 0
-	for _, file := range r.Files {
+	for name, file := range r.Files {
+		if IsTplSource(name) {
+			continue
+		}
 		for _, hits := range file.Branches {
 			total++
 			if hits > 0 {
