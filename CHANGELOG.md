@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.2](https://github.com/ClickHouse/helmcov/compare/v0.5.1...v0.5.2) (2026-11-05)
+
+
+### Bug Fixes
+
+* build with the latest Go release and harden CI checks ([#8](https://github.com/ClickHouse/helmcov/issues/8)) ([6fb20ba](https://github.com/ClickHouse/helmcov/commit/6fb20bac6ef1bec117a33d500810df02d9c834a1))
+* **cli:** skip packaged subchart templates listed in suites ([#11](https://github.com/ClickHouse/helmcov/issues/11)) ([bf87226](https://github.com/ClickHouse/helmcov/commit/bf87226103cca9701e1cb6af0c73e35124ca866e))
+* **instrumentation:** record coverage while templates execute ([#10](https://github.com/ClickHouse/helmcov/issues/10)) ([c85bb10](https://github.com/ClickHouse/helmcov/commit/c85bb10ee41edf6cecfdd169df3ccd101baa8d1f))
+
 ## [0.5.1](https://github.com/ClickHouse/helmcov/compare/v0.5.0...v0.5.1) (2026-11-05)
 
 
