@@ -99,22 +99,22 @@ func TestRenderAndTraceDoesNotRegisterUnrelatedTemplateLines(t *testing.T) {
 	}
 }
 
-func TestRegisterTemplateLinesSkipsCommentBlocks(t *testing.T) {
+func TestRenderAndTraceOnlyCountsLinesThatRender(t *testing.T) {
 	t.Parallel()
 
-	lines := map[string]int{}
-	registerTemplateLines("helpers.tpl", "{{- define \"demo.name\" -}}\n{{/*\ncomment line\n*/}}\nname: demo\n{{- end -}}", lines)
+	helpers := "{{- define \"demo.name\" -}}\n{{/*\ncomment line\n*/}}\nname: demo\n{{- end -}}"
+	trace, _, err := NewExecutor().RenderAndTrace("t.yaml", "{{ include \"demo.name\" . }}\n", map[string]any{}, map[string]string{"helpers.tpl": helpers})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
 
-	if _, ok := lines["helpers.tpl:2"]; ok {
-		t.Fatalf("expected comment opener to be skipped")
+	// define, comment and end lines produce no output of their own.
+	for _, line := range []string{"helpers.tpl:1", "helpers.tpl:2", "helpers.tpl:3", "helpers.tpl:4", "helpers.tpl:6"} {
+		if _, ok := trace.Lines[line]; ok {
+			t.Errorf("line %s should not be coverable", line)
+		}
 	}
-	if _, ok := lines["helpers.tpl:3"]; ok {
-		t.Fatalf("expected comment body to be skipped")
-	}
-	if _, ok := lines["helpers.tpl:4"]; ok {
-		t.Fatalf("expected comment closer to be skipped")
-	}
-	if _, ok := lines["helpers.tpl:5"]; !ok {
-		t.Fatalf("expected executable line to be registered")
+	if trace.Lines["helpers.tpl:5"] == 0 {
+		t.Errorf("helpers.tpl:5 should be covered; have %v", trace.Lines)
 	}
 }

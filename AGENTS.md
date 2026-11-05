@@ -74,9 +74,15 @@ user's reports.
 - Branch key: `<template path>:<line>:<construct>:<outcome>`, for example
   `if:true`/`if:false`, `range:empty`/`range:non-empty`,
   `with:empty`/`with:non-empty`.
+- Hits are recorded while the template executes, so conditions see the real
+  dot, variables and `include` arguments.
 - A branch counts as covered when its hit count is above zero in any scenario.
-- Comment blocks (`{{/* */}}`) and blank lines are not coverable.
-- `define` blocks are reported against the file that defines them.
+  Every branch is registered, including ones nested under a branch that never
+  ran.
+- A line is coverable when it holds template text or starts an action. Blank
+  lines, comments and lines holding only `define`, `else` or `end` are not.
+- `define` blocks are reported against the file that defines them. The top
+  level of a helper file never renders, so it is not reported.
 
 When you add a construct, add its keys to this list in the same PR.
 
