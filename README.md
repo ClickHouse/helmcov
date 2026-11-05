@@ -267,8 +267,10 @@ SonarQube does not natively parse Helm template coverage. The pragmatic path:
 2. feed Cobertura XML into your reporting pipeline as generic coverage input
 3. map/report results at CI stage until native Helm support exists
 
-## Project principles
+## Contributing
 
-- TDD-first implementation
-- deterministic output and scenario generation
-- package boundaries designed for extension (CLI, loader, tracing, reporters)
+See `CONTRIBUTING.md`. Coding agents should read `AGENTS.md`.
+
+## Licence
+
+Apache-2.0. See `LICENSE`.
