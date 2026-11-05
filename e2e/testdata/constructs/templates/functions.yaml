@@ -22,3 +22,6 @@ data:
   labels: |
     {{- toYaml .Values.labels | nindent 4 }}
   items: {{ .Values.items | toJson | quote }}
+  {{- if lookup "v1" "ConfigMap" .Release.Namespace "existing" }}
+  existing: "true"
+  {{- end }}

@@ -15,7 +15,14 @@ type Trace struct {
 	Branches map[string]int
 }
 
-type Executor struct{}
+// LookupFunc answers Helm's lookup function.
+type LookupFunc func(apiVersion, kind, namespace, name string) (map[string]any, error)
+
+// Executor renders templates. Lookup answers lookup; nil means no cluster, so
+// lookup returns an empty map as it does under helm template.
+type Executor struct {
+	Lookup LookupFunc
+}
 
 func NewExecutor() *Executor {
 	return &Executor{}
@@ -32,7 +39,7 @@ func (e *Executor) RenderAndTrace(templateName string, tpl string, values map[st
 	sources[templateName] = tpl
 
 	root := template.New("gotpl").Option("missingkey=zero")
-	bindHelmTemplateFuncs(root, &trace)
+	bindHelmTemplateFuncs(root, &trace, e.Lookup)
 	for _, path := range slices.Sorted(maps.Keys(sources)) {
 		if _, err := root.New(path).Parse(sources[path]); err != nil {
 			return trace, "", fmt.Errorf("parse template %s: %w", path, err)
