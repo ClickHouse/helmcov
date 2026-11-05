@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/ClickHouse/helmcov/compare/v0.5.0...v0.5.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* publish release binaries from ClickHouse/helmcov ([e9a0ffa](https://github.com/ClickHouse/helmcov/commit/e9a0ffa0b6f3f4f114bd7391469931cc524c22d3))
+* publish release binaries from ClickHouse/helmcov ([aff08a2](https://github.com/ClickHouse/helmcov/commit/aff08a2a3cee00d5e2f466f545135792457e34a9))
+
 ## [0.5.0](https://github.com/ClickHouse/helmcov/compare/v0.4.3...v0.5.0) (2026-11-05)
 
 
