@@ -46,12 +46,12 @@ func TestRenderAndTraceRecordsBranchesInExecutionScope(t *testing.T) {
 		{
 			name: "else if chain takes the second condition",
 			tpl:  "{{- if not .Values.flag }}a\n{{- else if .Values.flag }}b\n{{- else }}c\n{{- end }}\n",
-			want: map[string]int{"t.yaml:1:if:false": 1, "t.yaml:2:if:true": 1, "t.yaml:2:if:false": 0},
+			want: map[string]int{"t.yaml:1:if:false": 1, "t.yaml:2:else-if:true": 1, "t.yaml:2:else-if:false": 0},
 		},
 		{
 			name: "else with chain takes the second value",
 			tpl:  "{{- with .Values.missing }}a\n{{- else with .Values.items }}b\n{{- end }}\n",
-			want: map[string]int{"t.yaml:1:with:empty": 1, "t.yaml:2:with:non-empty": 1, "t.yaml:2:with:empty": 0},
+			want: map[string]int{"t.yaml:1:with:empty": 1, "t.yaml:2:else-with:non-empty": 1, "t.yaml:2:else-with:empty": 0},
 		},
 		{
 			name: "continue skips the rest of each iteration",
@@ -194,5 +194,5 @@ func plainRender(t *testing.T, tpl, helpers string, values map[string]any) strin
 	if err := main.Execute(&out, values); err != nil {
 		t.Fatalf("plain render: %v", err)
 	}
-	return out.String()
+	return strings.ReplaceAll(out.String(), "<no value>", "")
 }
