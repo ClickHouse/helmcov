@@ -17,7 +17,10 @@ const recursionMaxNums = 1000
 // bindHelmTemplateFuncs gives t Helm's function map. Templates cannot read the
 // environment, and required and fail never stop a render, because generated
 // scenarios often leave required values unset.
-func bindHelmTemplateFuncs(t *template.Template, trace *Trace) {
+func bindHelmTemplateFuncs(t *template.Template, trace *Trace, lookup LookupFunc) {
+	if lookup == nil {
+		lookup = noCluster
+	}
 	includedNames := make(map[string]int)
 	funcMap := sprig.TxtFuncMap()
 	delete(funcMap, "env")
@@ -118,6 +121,6 @@ func required(_ string, value any) any {
 	return value
 }
 
-func lookup(string, string, string, string) (map[string]any, error) {
+func noCluster(string, string, string, string) (map[string]any, error) {
 	return map[string]any{}, nil
 }

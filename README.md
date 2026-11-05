@@ -26,7 +26,11 @@ Rendering matches helm-unittest. The default release is `RELEASE-NAME` in
 `capabilities` and `chart` a suite or test sets apply on top. `templates` globs
 such as `"*.yaml"` expand the same way. A chart that branches on
 `.Capabilities.APIVersions.Has` needs its suites to list those versions under
-`capabilities.apiVersions`, as helm-unittest itself requires.
+`capabilities.apiVersions`, as helm-unittest itself requires. `lookup` answers
+from the objects in a suite's or test's `kubernetesProvider`, and returns
+nothing without them, as it does under `helm template`. Assertion options such
+as `documentSelector` only choose which document an assertion checks, so they
+do not change coverage.
 
 Helm's built-ins work as they do in Helm, including `.Files`, `.helmignore`,
 `tpl`, `toYaml` and how values files are parsed. An e2e test diffs helmcov's output
@@ -152,12 +156,8 @@ To run the CLI in CI without the action, download a release or use
 
 ## Limitations
 
-- Branch keys include only the line, so two constructs of the same kind on one
-  line share keys and their hits add up.
-- `lookup` returns nothing and helm-unittest's `kubernetesProvider` is not
-  modelled, so branches on cluster state stay uncovered.
-- helm-unittest's `documentSelector` is not modelled: a test renders whole
-  templates.
+Branch keys include only the line, so two constructs of the same kind on one
+line share keys and their hits add up.
 
 ## Contributing
 

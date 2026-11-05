@@ -37,7 +37,6 @@ func Run(args []string, stdout io.Writer) error {
 		return err
 	}
 
-	exec := instrumentation.NewExecutor()
 	traces := make([]instrumentation.Trace, 0, 32)
 	totalSuites := 0
 	for _, target := range targets {
@@ -55,7 +54,7 @@ func Run(args []string, stdout io.Writer) error {
 		}
 		totalSuites += len(bundle.Suites)
 		chart := chartRenderer{
-			exec: exec, chartPath: target.ChartPath, meta: bundle.Chart, kubeVersion: cfg.KubeVersion,
+			chartPath: target.ChartPath, meta: bundle.Chart, kubeVersion: cfg.KubeVersion,
 			files: chartFiles, templates: chartTemplates, sources: map[string]templateSource{},
 		}
 		for _, suite := range bundle.Suites {
@@ -137,7 +136,6 @@ type templateSource struct {
 }
 
 type chartRenderer struct {
-	exec        *instrumentation.Executor
 	chartPath   string
 	meta        chartloader.ChartMeta
 	kubeVersion string
@@ -156,7 +154,8 @@ func (c chartRenderer) trace(job renderJob) (instrumentation.Trace, bool, error)
 	meta := c.meta
 	meta.Version = cmp.Or(job.context.ChartVersion, meta.Version)
 	meta.AppVersion = cmp.Or(job.context.ChartAppVersion, meta.AppVersion)
-	trace, _, err := c.exec.RenderAndTrace(src.file, src.content, chartloader.HelmRenderValues(chartloader.RenderOptions{
+	exec := instrumentation.Executor{Lookup: job.context.Lookup}
+	trace, _, err := exec.RenderAndTrace(src.file, src.content, chartloader.HelmRenderValues(chartloader.RenderOptions{
 		Chart:        meta,
 		Values:       job.values,
 		ChartPath:    c.chartPath,

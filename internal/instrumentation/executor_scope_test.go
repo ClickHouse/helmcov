@@ -187,7 +187,7 @@ func TestRenderAndTraceOutputMatchesPlainRender(t *testing.T) {
 func plainRender(t *testing.T, tpl, helpers string, values map[string]any) string {
 	t.Helper()
 	root := template.New("gotpl").Option("missingkey=zero")
-	bindHelmTemplateFuncs(root, &Trace{Lines: map[string]int{}, Branches: map[string]int{}})
+	bindHelmTemplateFuncs(root, &Trace{Lines: map[string]int{}, Branches: map[string]int{}}, nil)
 	template.Must(root.New("_helpers.tpl").Parse(helpers))
 	main := template.Must(root.New("t.yaml").Parse(tpl))
 	var out strings.Builder
