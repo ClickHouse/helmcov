@@ -9,7 +9,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 
 	"sigs.k8s.io/yaml"
@@ -171,60 +170,51 @@ func (f ChartFiles) asMap(value func([]byte) string) string {
 	return strings.TrimSuffix(string(data), "\n")
 }
 
+// globToken splits a glob into **, an escape, a [class], a single special
+// character, or a run of literal text.
+var globToken = regexp.MustCompile(`\*\*|\\.?|\[[^\]]*\]|[*?{},\[]|[^*?{},\[\\]+`)
+
 // compileGlob converts a Helm glob (gobwas/glob with '/' as the separator) to a
 // regexp: ** crosses directories, * and ? do not, and {a,b} picks one alternative.
 func compileGlob(pattern string) (*regexp.Regexp, error) {
 	var b strings.Builder
 	b.WriteString("^")
 	depth := 0
-	runes := []rune(pattern)
-	for i := 0; i < len(runes); i++ {
-		switch c := runes[i]; c {
-		case '*':
-			if i+1 < len(runes) && runes[i+1] == '*' {
-				b.WriteString(".*")
-				i++
-			} else {
-				b.WriteString("[^/]*")
-			}
-		case '?':
+	for _, tok := range globToken.FindAllString(pattern, -1) {
+		switch {
+		case tok == "**":
+			b.WriteString(".*")
+		case tok == "*":
+			b.WriteString("[^/]*")
+		case tok == "?":
 			b.WriteString("[^/]")
-		case '{':
+		case tok == "{":
 			depth++
 			b.WriteString("(?:")
-		case '}':
+		case tok == "}":
 			if depth == 0 {
 				return nil, fmt.Errorf("unmatched } in %q", pattern)
 			}
 			depth--
 			b.WriteString(")")
-		case ',':
-			if depth > 0 {
-				b.WriteString("|")
-			} else {
-				b.WriteString(",")
-			}
-		case '[':
-			end := slices.Index(runes[i:], ']')
-			if end < 0 {
-				return nil, fmt.Errorf("unmatched [ in %q", pattern)
-			}
-			class := string(runes[i+1 : i+end])
+		case tok == ",":
+			b.WriteString(map[bool]string{true: "|", false: ","}[depth > 0])
+		case tok == "[":
+			return nil, fmt.Errorf("unmatched [ in %q", pattern)
+		case strings.HasPrefix(tok, "["):
+			class := tok[1 : len(tok)-1]
 			if strings.HasPrefix(class, "!") {
 				class = "^" + class[1:]
 			} else if strings.HasPrefix(class, "^") {
 				class = `\^` + class[1:] // gobwas treats ^ literally
 			}
 			b.WriteString("[" + class + "]")
-			i += end
-		case '\\':
-			if i+1 == len(runes) {
-				return nil, fmt.Errorf("trailing backslash in %q", pattern)
-			}
-			i++
-			b.WriteString(regexp.QuoteMeta(string(runes[i])))
+		case tok == `\`:
+			return nil, fmt.Errorf("trailing backslash in %q", pattern)
+		case strings.HasPrefix(tok, `\`):
+			b.WriteString(regexp.QuoteMeta(tok[1:]))
 		default:
-			b.WriteString(regexp.QuoteMeta(string(c)))
+			b.WriteString(regexp.QuoteMeta(tok))
 		}
 	}
 	if depth != 0 {
