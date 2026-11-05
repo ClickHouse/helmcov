@@ -18,8 +18,11 @@ build_from_dir() {
 }
 
 binary_supports_markdown() {
-  [ -x "${INSTALL_DIR}/helmcov" ] && \
-    "${INSTALL_DIR}/helmcov" --help 2>&1 | grep -q 'markdown-file'
+  [ -x "${INSTALL_DIR}/helmcov" ] || return 1
+  # --help exits non-zero, so capture it before grep or pipefail fails the check.
+  local help
+  help="$("${INSTALL_DIR}/helmcov" --help 2>&1 || true)"
+  grep -q 'markdown-file' <<<"$help"
 }
 
 if [ "$VERSION" = "dev" ]; then
@@ -69,15 +72,34 @@ case "$OS" in
     ;;
 esac
 
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
+
 VERSION_NUM="${VERSION#v}"
 ASSET="helmcov_${VERSION_NUM}_${OS}_${ARCH}"
-if [ "$OS" = "windows" ]; then
-  ARCHIVE="${INSTALL_DIR}/${ASSET}.zip"
-  curl -fsSL "https://github.com/${REPO}/releases/download/${VERSION}/${ASSET}.zip" -o "$ARCHIVE"
+EXT="tar.gz"
+[ "$OS" = "windows" ] && EXT="zip"
+ARCHIVE="${INSTALL_DIR}/${ASSET}.${EXT}"
+RELEASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
+curl -fsSL "${RELEASE_URL}/${ASSET}.${EXT}" -o "$ARCHIVE"
+curl -fsSL "${RELEASE_URL}/checksums.txt" -o "${INSTALL_DIR}/checksums.txt"
+
+# Refuse to run a binary whose archive does not match the release's checksums.txt.
+expected="$(awk -v f="${ASSET}.${EXT}" '$2 == f {print $1}' "${INSTALL_DIR}/checksums.txt")"
+actual="$(sha256 "$ARCHIVE")"
+if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+  echo "checksum mismatch for ${ASSET}.${EXT}: expected '${expected}', got '${actual}'" >&2
+  exit 1
+fi
+
+if [ "$EXT" = "zip" ]; then
   unzip -o "$ARCHIVE" -d "$INSTALL_DIR"
 else
-  ARCHIVE="${INSTALL_DIR}/${ASSET}.tar.gz"
-  curl -fsSL "https://github.com/${REPO}/releases/download/${VERSION}/${ASSET}.tar.gz" -o "$ARCHIVE"
   tar -xzf "$ARCHIVE" -C "$INSTALL_DIR"
 fi
 
@@ -85,6 +107,11 @@ chmod +x "${INSTALL_DIR}/helmcov"
 
 if binary_supports_markdown; then
   exit 0
+fi
+
+if [ "${HELMCOV_REQUIRE_RELEASE:-}" = "1" ]; then
+  echo "helmcov ${VERSION} lacks markdown support and HELMCOV_REQUIRE_RELEASE=1 forbids building from source" >&2
+  exit 1
 fi
 
 ACTION_ROOT="${GITHUB_ACTION_PATH:-}"

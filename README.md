@@ -28,19 +28,22 @@ specific values. `helmcov` focuses on those divergent branches.
 
 ## Install
 
-### Binary
-
-Build from source:
-
-```bash
-go build -o helmcov ./cmd/helmcov
-```
-
-### Docker
+Download a binary for Linux, macOS or Windows from the
+[releases page](https://github.com/ClickHouse/helmcov/releases), or:
 
 ```bash
-docker build -t helmcov:dev .
+go install github.com/ClickHouse/helmcov/cmd/helmcov@latest
 ```
+
+Release archives carry build provenance, so you can check one was built by
+this repository's release workflow:
+
+```bash
+gh attestation verify helmcov_<version>_<os>_<arch>.tar.gz --repo ClickHouse/helmcov
+```
+
+The GitHub Action checks each download against the release's `checksums.txt`
+before running it.
 
 ## Development workflow
 
