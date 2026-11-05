@@ -21,6 +21,7 @@ jobs:
           tests: examples/branch-heavy-chart/tests
           version: dev
           threshold: "0"
+          branch-threshold: "1"
 
   monorepo-coverage:
     runs-on: ubuntu-latest

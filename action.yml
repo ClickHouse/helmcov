@@ -21,6 +21,10 @@ inputs:
     description: Minimum line coverage percentage (0-100). Fails the step when coverage is lower.
     required: false
     default: "0"
+  branch-threshold:
+    description: Minimum branch coverage percentage (0-100). Fails the step when coverage is lower.
+    required: false
+    default: "0"
   version:
     description: helmcov release tag (for example v0.4.2), latest for the newest release, or dev to build from source.
     required: false
@@ -107,6 +111,10 @@ runs:
           --seed "${{ inputs.seed }}"
           --kube-version "${{ inputs.kube-version }}"
         )
+        # Only when set, so pinned releases older than the flag keep working.
+        if [ "${{ inputs.branch-threshold }}" != "0" ] && [ -n "${{ inputs.branch-threshold }}" ]; then
+          ARGS+=(--branch-threshold "${{ inputs.branch-threshold }}")
+        fi
         if [ "${{ inputs.file-summary }}" = "true" ]; then
           ARGS+=(--markdown-file-summary)
         fi
