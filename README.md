@@ -11,6 +11,9 @@ and generated branch-oriented scenarios to estimate:
 - line coverage in template files
 - branch coverage for `if`, `range`, and `with`
 
+Coverage counts the chart's own templates. Suites may also list a packaged
+dependency's templates (`charts/<subchart>/templates/...`); helmcov skips those.
+
 It emits:
 
 - native Go `coverprofile`
