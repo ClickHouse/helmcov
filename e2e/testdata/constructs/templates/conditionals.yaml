@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "constructs.fullname" . }}-conditionals
+data:
+  {{- if eq .Values.mode "prod" }}
+  mode: production
+  {{- else if eq .Values.mode "staging" }}
+  mode: staging
+  {{- else }}
+  mode: development
+  {{- end }}
+  {{- if and .Values.featureA .Values.featureB }}
+  features: both
+  {{- end }}
+  {{- if .Values.debug }}
+  {{- if gt (int .Values.replicas) 1 }}
+  debugReplicas: "many"
+  {{- end }}
+  {{- end }}

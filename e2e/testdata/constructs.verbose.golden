@@ -1,0 +1,56 @@
+helmcov: target=testdata/constructs tests=testdata/constructs/tests formats=cobertura,go suites=2 line-coverage=90.67% branch-coverage=64.29%
+coverage details:
+template: testdata/constructs/templates/_helpers.tpl
+  line-coverage: 71.43% (5/7)
+  uncovered lines:
+    - testdata/constructs/templates/_helpers.tpl:3 "{{- .Values.nameOverride | trunc 63 }}"
+    - testdata/constructs/templates/_helpers.tpl:18 "never: rendered"
+  uncovered branches:
+    - testdata/constructs/templates/_helpers.tpl:2 "{{- if .Values.nameOverride }}" (if:true)
+template: testdata/constructs/templates/conditionals.yaml
+  line-coverage: 93.33% (14/15)
+  uncovered lines:
+    - testdata/constructs/templates/conditionals.yaml:9 "mode: staging"
+  uncovered branches:
+    - testdata/constructs/templates/conditionals.yaml:17 "{{- if gt (int .Values.replicas) 1 }}" (if:false)
+    - testdata/constructs/templates/conditionals.yaml:8 "{{- else if eq .Values.mode \"staging\" }}" (if:true)
+template: testdata/constructs/templates/functions.yaml
+  line-coverage: 95.00% (19/20)
+  uncovered lines:
+    - testdata/constructs/templates/functions.yaml:8 "tplOfMissing: truthy"
+  uncovered branches:
+    - testdata/constructs/templates/functions.yaml:16 "{{- if empty .Values.annotations }}" (if:false)
+    - testdata/constructs/templates/functions.yaml:19 "{{- if hasKey .Values \"labels\" }}" (if:false)
+    - testdata/constructs/templates/functions.yaml:7 "{{- if tpl \"{{ .Values.missing }}\" . }}" (if:true)
+template: testdata/constructs/templates/loops.yaml
+  line-coverage: 94.44% (17/18)
+  uncovered lines:
+    - testdata/constructs/templates/loops.yaml:15 "annotation: {{ . }}"
+  uncovered branches:
+    - testdata/constructs/templates/loops.yaml:11 "{{- range $key, $value := .Values.labels }}" (range:empty)
+    - testdata/constructs/templates/loops.yaml:14 "{{- range .Values.annotations }}" (range:non-empty)
+    - testdata/constructs/templates/loops.yaml:19 "{{- range $i, $item := .Values.items }}" (range:empty)
+    - testdata/constructs/templates/loops.yaml:23 "{{- range $n := int .Values.replicas }}" (range:empty)
+    - testdata/constructs/templates/loops.yaml:6 "{{- range .Values.items }}" (range:empty)
+template: testdata/constructs/templates/scopes.yaml
+  line-coverage: 86.67% (13/15)
+  uncovered lines:
+    - testdata/constructs/templates/scopes.yaml:12 "{{- else with .Values.fallback }}"
+    - testdata/constructs/templates/scopes.yaml:13 "greeting: {{ . }}"
+  uncovered branches:
+    - testdata/constructs/templates/scopes.yaml:12 "{{- else with .Values.fallback }}" (with:empty)
+    - testdata/constructs/templates/scopes.yaml:12 "{{- else with .Values.fallback }}" (with:non-empty)
+    - testdata/constructs/templates/scopes.yaml:15 "{{- range .Values.items }}" (range:empty)
+    - testdata/constructs/templates/scopes.yaml:7 "{{- with .Values.config }}" (with:empty)
+template: tpl:99151209
+  line-coverage: 100.00% (1/1)
+  uncovered lines:
+    - none
+  uncovered branches:
+    - none
+template: tpl:b6dbee69
+  line-coverage: 100.00% (1/1)
+  uncovered lines:
+    - none
+  uncovered branches:
+    - none

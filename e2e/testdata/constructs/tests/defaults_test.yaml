@@ -1,0 +1,11 @@
+suite: defaults
+templates:
+  - templates/conditionals.yaml
+  - templates/loops.yaml
+  - templates/scopes.yaml
+  - templates/functions.yaml
+tests:
+  - it: renders with chart defaults
+    asserts:
+      - isKind:
+          of: ConfigMap

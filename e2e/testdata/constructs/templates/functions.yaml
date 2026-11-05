@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "constructs.fullname" . }}-functions
+data:
+  missingQuoted: {{ .Values.missing | quote }}
+  {{- if tpl "{{ .Values.missing }}" . }}
+  tplOfMissing: truthy
+  {{- else }}
+  tplOfMissing: empty
+  {{- end }}
+  defaulted: {{ .Values.missing | default "fallback" }}
+  required: {{ required "mode is required" .Values.mode }}
+  ternary: {{ ternary "on" "off" .Values.featureA }}
+  coalesce: {{ coalesce .Values.missing .Values.mode }}
+  {{- if empty .Values.annotations }}
+  annotationsEmpty: "true"
+  {{- end }}
+  {{- if hasKey .Values "labels" }}
+  hasLabels: "true"
+  {{- end }}
+  labels: |
+    {{- toYaml .Values.labels | nindent 4 }}
+  items: {{ .Values.items | toJson | quote }}

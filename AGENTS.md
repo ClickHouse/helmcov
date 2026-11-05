@@ -31,6 +31,7 @@ The CLI flags, the output formats and the action inputs are the public contract.
 | `make setup` | Install the commit-msg hook and tidy modules, once per clone |
 | `make test` | All Go tests |
 | `make integration-test` | The CLI run against `examples/` |
+| `make e2e` | The built binary against `e2e/testdata`, plus a render diff against `helm template` |
 | `make cover` | Tests with coverage; fails below 70% |
 | `make lint` | `go vet` plus golangci-lint |
 | `make ci` | What CI runs. Run it before pushing |
@@ -97,6 +98,12 @@ When you add a construct, add its keys to this list in the same PR.
 - Assert exact trace keys and hit counts, not just percentages. A percentage
   can stay the same while the wrong branch is counted.
 - Every bug fix comes with a test that fails without the fix.
+- `e2e/` builds the real binary and checks its output against golden files
+  for `e2e/testdata/constructs`, a chart with one template per traced
+  construct. When you add a construct, add it to that chart, run
+  `go test ./e2e -update`, and check every changed line of the golden diff by
+  hand. The same package diffs helmcov's render against `helm template`; it
+  skips when `helm` is not installed.
 
 ## Commits
 

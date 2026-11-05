@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"maps"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -22,7 +21,6 @@ func baseHelmFuncMap() template.FuncMap {
 	delete(funcMap, "expandenv")
 
 	extras := template.FuncMap{
-		"quote":         quote,
 		"toYaml":        toYAML,
 		"mustToYaml":    mustToYAML,
 		"toYamlPretty":  toYAMLPretty,
@@ -95,7 +93,8 @@ func tplFun(parent *template.Template, includedNames map[string]int, trace *Trac
 		if err := parsed.Execute(&buf, vals); err != nil {
 			return "", fmt.Errorf("error during tpl function execution for %q: %w", tpl, err)
 		}
-		return buf.String(), nil
+		// Helm strips the marker text/template prints for a missing key.
+		return strings.ReplaceAll(buf.String(), "<no value>", ""), nil
 	}
 }
 
@@ -103,10 +102,6 @@ func tplSourceName(content string) string {
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(content))
 	return fmt.Sprintf("tpl:%x", hash.Sum32())
-}
-
-func quote(value any) string {
-	return strconv.Quote(fmt.Sprintf("%v", value))
 }
 
 func toYAML(value any) string {
