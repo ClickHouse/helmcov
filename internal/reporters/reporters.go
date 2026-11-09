@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strconv"
 
@@ -120,4 +121,43 @@ type coberturaClass struct {
 type coberturaLine struct {
 	Number string `xml:"number,attr"`
 	Hits   string `xml:"hits,attr"`
+}
+
+// Rates are line and branch coverage as fractions from 0 to 1.
+type Rates struct {
+	Line, Branch float64
+}
+
+// ReadCoberturaRates reads the totals from a Cobertura XML report, such as one
+// helmcov wrote for the base branch.
+func ReadCoberturaRates(reader io.Reader) (Rates, error) {
+	var root struct {
+		LineRate   string `xml:"line-rate,attr"`
+		BranchRate string `xml:"branch-rate,attr"`
+	}
+	if err := xml.NewDecoder(reader).Decode(&root); err != nil {
+		return Rates{}, fmt.Errorf("parse cobertura XML: %w", err)
+	}
+	line, err := strconv.ParseFloat(root.LineRate, 64)
+	if err != nil {
+		return Rates{}, fmt.Errorf("parse line-rate %q: %w", root.LineRate, err)
+	}
+	branch, err := strconv.ParseFloat(root.BranchRate, 64)
+	if err != nil {
+		return Rates{}, fmt.Errorf("parse branch-rate %q: %w", root.BranchRate, err)
+	}
+	return Rates{Line: line, Branch: branch}, nil
+}
+
+// change formats rate against a baseline as " (+1.25)" in percentage points.
+// rate goes through the Cobertura writer's rounding first, so unchanged coverage shows +0.00.
+func change(rate float64, baseline *Rates, pick func(Rates) float64) string {
+	if baseline == nil {
+		return ""
+	}
+	written, err := strconv.ParseFloat(fmt.Sprintf("%.4f", rate), 64)
+	if err != nil {
+		return "" // unreachable: %.4f always formats a float
+	}
+	return fmt.Sprintf(" (%+.2f)", math.Round((written-pick(*baseline))*10000)/100)
 }

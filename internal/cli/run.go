@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
@@ -78,7 +79,11 @@ func Run(args []string, stdout io.Writer) error {
 
 	report := coverage.FromTraces(traces)
 	testReport := coverage.FromTraces(testTraces)
-	if err := writeRequestedFormats(cfg, report, testReport); err != nil {
+	baseline, err := readBaseline(cfg.BaselinePath)
+	if err != nil {
+		return err
+	}
+	if err := writeRequestedFormats(cfg, report, testReport, baseline); err != nil {
 		return err
 	}
 
@@ -272,7 +277,7 @@ func testsLabel(cfg Config) string {
 	return cfg.TestsPath
 }
 
-func writeRequestedFormats(cfg Config, report, testReport coverage.Report) error {
+func writeRequestedFormats(cfg Config, report, testReport coverage.Report, baseline *reporters.Rates) error {
 	for _, format := range cfg.Formats {
 		switch format {
 		case "go":
@@ -296,6 +301,7 @@ func writeRequestedFormats(cfg Config, report, testReport coverage.Report) error
 					ShowFileSummary:   cfg.MarkdownFileSummary,
 					IncludeTplSources: cfg.MarkdownIncludeTpl,
 					Tests:             &testReport,
+					Baseline:          baseline,
 				})
 			}); err != nil {
 				return fmt.Errorf("write markdown: %w", err)
@@ -305,6 +311,22 @@ func writeRequestedFormats(cfg Config, report, testReport coverage.Report) error
 		}
 	}
 	return nil
+}
+
+// readBaseline reads the --baseline report, or returns nil when none was given.
+func readBaseline(path string) (*reporters.Rates, error) {
+	if path == "" {
+		return nil, nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read baseline: %w", err)
+	}
+	rates, err := reporters.ReadCoberturaRates(bytes.NewReader(content))
+	if err != nil {
+		return nil, fmt.Errorf("read baseline %s: %w", path, err)
+	}
+	return &rates, nil
 }
 
 func writeToFile(path string, writeFn func(io.Writer) error) (err error) {

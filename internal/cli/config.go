@@ -28,6 +28,7 @@ type Config struct {
 	MarkdownFileSummary bool
 	MarkdownIncludeTpl  bool
 	KubeVersion         string
+	BaselinePath        string
 }
 
 func ParseConfig(args []string) (Config, error) {
@@ -53,6 +54,7 @@ func ParseConfig(args []string) (Config, error) {
 	fs.BoolVar(&cfg.MarkdownFileSummary, "markdown-file-summary", false, "include per-file summary table in markdown output")
 	fs.BoolVar(&cfg.MarkdownIncludeTpl, "markdown-include-tpl", false, "include tpl(...) inline template sources in markdown output")
 	fs.StringVar(&cfg.KubeVersion, "kube-version", "", "Kubernetes version for .Capabilities when a suite sets none (default helm-unittest's 1.20.0)")
+	fs.StringVar(&cfg.BaselinePath, "baseline", "", "Cobertura XML from an earlier run, such as the base branch, to show coverage change against in the markdown report")
 	fs.BoolVar(&cfg.Verbose, "verbose", false, "print per-file and uncovered coverage details")
 	fs.BoolVar(&cfg.ShowVersion, "version", false, "print the helmcov version and exit")
 

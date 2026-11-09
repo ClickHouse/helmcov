@@ -94,6 +94,7 @@ helmcov --chart charts/my-app --threshold 80 --branch-threshold 70 --verbose
 | `--comment-marker` | `helmcov-comment` | HTML comment that identifies the markdown report |
 | `--max-scenarios` | `20` | Value scenarios per suite, including the suite's own values. `1` adds no generated variants, so coverage is close to what the tests alone reach |
 | `--seed` | `42` | Seed for choosing generated variants |
+| `--baseline` | | Cobertura XML from an earlier run, such as the base branch. The markdown report shows the change from it |
 | `--kube-version` | `1.20.0` | Kubernetes version for suites that set none |
 | `--verbose` | off | Print each file's uncovered lines and branches with their source |
 | `--version` | | Print the helmcov version and exit |
@@ -129,6 +130,14 @@ jobs:
 
 For a repository with many charts, use `charts: charts` instead of `chart`.
 
+On a pull request the comment shows the change from the base commit, which
+the action measures in a second run with the same binary and settings. That
+roughly doubles the run time; set `compare-base: "false"` to skip it. When the
+base cannot render, for example because the PR adds the chart, the comment
+shows the totals without a change. The base commit is fetched with the credentials
+`actions/checkout` saved, and the repository must be checked out at the
+workspace root; otherwise the comparison is skipped.
+
 | Input | Default | Meaning |
 |-------|---------|---------|
 | `chart` | | Chart directory |
@@ -141,6 +150,7 @@ For a repository with many charts, use `charts: charts` instead of `chart`.
 | `comment-marker` | `helmcov-comment` | Identifies the comment to update |
 | `token` | `github.token` | Token used to comment |
 | `file-summary` | `false` | Add a per-file table to the comment |
+| `compare-base` | `true` | On pull requests, also measure the base commit and show the coverage change in the comment |
 | `include-tpl-sources` | `false` | List `tpl` sources in the comment |
 | `markdown-file` | `helmcov-coverage.md` | Where to write the markdown report |
 | `max-scenarios` | `20` | As `--max-scenarios` |
