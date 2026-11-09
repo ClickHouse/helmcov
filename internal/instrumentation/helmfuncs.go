@@ -85,7 +85,7 @@ func tplFun(parent *template.Template, includedNames map[string]int, trace *Trac
 		}
 
 		if parsed.Tree != nil {
-			instrumentTree(parsed.Tree, tplSourceName(tpl), tpl, trace)
+			instrumentTree(parsed.Tree, tplSourceName(tpl), tpl, trace, map[string]int{})
 		}
 
 		var buf bytes.Buffer

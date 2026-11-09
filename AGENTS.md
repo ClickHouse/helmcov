@@ -93,7 +93,9 @@ user's reports.
   - `default`: `value`/`fallback`
   - `ternary`: `true`/`false`
   - `coalesce(N)`: `used` when argument N is the one returned
-- Two constructs of the same kind on one line share keys, so their hits add up.
+- The second and later constructs of the same kind on one line get `#N` after
+  the kind, in source order: `if#2`, `default#2`, `and#2(1)`, `coalesce#2(1)`.
+  The first keeps the plain key, so single-construct lines are unaffected.
 - Hits are recorded while the template executes, so conditions see the real
   dot, variables and `include` arguments.
 - A branch counts as covered when its hit count is above zero in any scenario.

@@ -165,3 +165,128 @@ func TestLiteralOperandsAreNotBranches(t *testing.T) {
 		t.Errorf("branches = %v, want %v", trace.Branches, want)
 	}
 }
+
+func TestSameKindOnOneLineGetsNumberedKeys(t *testing.T) {
+	t.Parallel()
+
+	values := map[string]any{"Values": map[string]any{"on": true, "off": false, "name": "x", "empty": ""}}
+	cases := []struct {
+		name string
+		tpl  string
+		want map[string]int
+	}{
+		{
+			name: "two ifs",
+			tpl:  "{{ if .Values.on }}a{{ end }}{{ if .Values.off }}b{{ end }}\n",
+			want: map[string]int{
+				"t.yaml:1:if:true": 1, "t.yaml:1:if:false": 0,
+				"t.yaml:1:if#2:true": 0, "t.yaml:1:if#2:false": 1,
+			},
+		},
+		{
+			name: "a nested if is numbered after the one that holds it",
+			tpl:  "{{ if .Values.on }}{{ if .Values.off }}b{{ end }}{{ end }}\n",
+			want: map[string]int{
+				"t.yaml:1:if:true": 1, "t.yaml:1:if:false": 0,
+				"t.yaml:1:if#2:true": 0, "t.yaml:1:if#2:false": 1,
+			},
+		},
+		{
+			name: "a nested default is numbered after the outer one",
+			tpl:  "{{ default (default \"z\" .Values.empty) .Values.name }}\n",
+			want: map[string]int{
+				"t.yaml:1:default:value": 1, "t.yaml:1:default:fallback": 0,
+				"t.yaml:1:default#2:value": 0, "t.yaml:1:default#2:fallback": 1,
+			},
+		},
+		{
+			name: "and, or, ternary and coalesce",
+			tpl:  "{{ and .Values.on .Values.off }}{{ and .Values.off .Values.on }}{{ or .Values.on }}{{ or .Values.off }}{{ ternary 1 2 .Values.on }}{{ ternary 1 2 .Values.off }}{{ coalesce .Values.empty .Values.name }}{{ coalesce .Values.name }}\n",
+			want: map[string]int{
+				"t.yaml:1:and(1):true": 1, "t.yaml:1:and(1):false": 0, "t.yaml:1:and(2):true": 0, "t.yaml:1:and(2):false": 1,
+				"t.yaml:1:and#2(1):true": 0, "t.yaml:1:and#2(1):false": 1, "t.yaml:1:and#2(2):true": 0, "t.yaml:1:and#2(2):false": 0,
+				"t.yaml:1:or(1):true": 1, "t.yaml:1:or(1):false": 0,
+				"t.yaml:1:or#2(1):true": 0, "t.yaml:1:or#2(1):false": 1,
+				"t.yaml:1:ternary:true": 1, "t.yaml:1:ternary:false": 0,
+				"t.yaml:1:ternary#2:true": 0, "t.yaml:1:ternary#2:false": 1,
+				"t.yaml:1:coalesce(1):used": 0, "t.yaml:1:coalesce(2):used": 1,
+				"t.yaml:1:coalesce#2(1):used": 1,
+			},
+		},
+		{
+			name: "an and or or with only literals takes no number",
+			tpl:  "{{ or \"a\" \"b\" }}{{ or .Values.off .Values.on }}\n",
+			want: map[string]int{
+				"t.yaml:1:or(1):true": 0, "t.yaml:1:or(1):false": 1,
+				"t.yaml:1:or(2):true": 1, "t.yaml:1:or(2):false": 0,
+			},
+		},
+		{
+			name: "different kinds and lines keep plain keys",
+			tpl:  "{{ if .Values.on }}{{ with .Values.name }}{{ end }}{{ end }}\n{{ if .Values.off }}{{ end }}\n",
+			want: map[string]int{
+				"t.yaml:1:if:true": 1, "t.yaml:1:if:false": 0,
+				"t.yaml:1:with:non-empty": 1, "t.yaml:1:with:empty": 0,
+				"t.yaml:2:if:true": 0, "t.yaml:2:if:false": 1,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			trace, _, err := NewExecutor().RenderAndTrace("t.yaml", tc.tpl, values, nil)
+			if err != nil {
+				t.Fatalf("render: %v", err)
+			}
+			if !reflect.DeepEqual(trace.Branches, tc.want) {
+				t.Errorf("branches = %v\nwant %v", trace.Branches, tc.want)
+			}
+		})
+	}
+}
+
+func TestDefinesOnOneLineGetNumberedKeys(t *testing.T) {
+	t.Parallel()
+
+	helpers := `{{ define "a" }}{{ if .on }}a{{ end }}{{ end }}{{ define "b" }}{{ if .off }}b{{ end }}{{ end }}` + "\n"
+	tpl := `{{ include "a" .Values }}{{ include "b" .Values }}` + "\n"
+	values := map[string]any{"Values": map[string]any{"on": true, "off": false}}
+	trace, _, err := NewExecutor().RenderAndTrace("t.yaml", tpl, values, map[string]string{"_h.tpl": helpers})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	want := map[string]int{
+		"_h.tpl:1:if:true": 1, "_h.tpl:1:if:false": 0,
+		"_h.tpl:1:if#2:true": 0, "_h.tpl:1:if#2:false": 1,
+	}
+	if !reflect.DeepEqual(trace.Branches, want) {
+		t.Errorf("branches = %v\nwant %v", trace.Branches, want)
+	}
+}
+
+func TestDefineKeysDoNotDependOnTheTarget(t *testing.T) {
+	t.Parallel()
+
+	// The top level and the define share line 1 of a.yaml.
+	a := `{{ if .Values.on }}a{{ end }}{{ define "d" }}{{ if .on }}d{{ end }}{{ end }}` + "\n"
+	b := `{{ include "d" .Values }}` + "\n"
+	templates := map[string]string{"a.yaml": a, "b.yaml": b}
+	values := map[string]any{"Values": map[string]any{"on": true}}
+	keys := func(target, src string) map[string]int {
+		t.Helper()
+		trace, _, err := NewExecutor().RenderAndTrace(target, src, values, templates)
+		if err != nil {
+			t.Fatalf("render %s: %v", target, err)
+		}
+		return trace.Branches
+	}
+	if got, want := keys("a.yaml", a), map[string]int{
+		"a.yaml:1:if:true": 0, "a.yaml:1:if:false": 0,
+		"a.yaml:1:if#2:true": 1, "a.yaml:1:if#2:false": 0,
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("rendering a.yaml: %v\nwant %v", got, want)
+	}
+	if got, want := keys("b.yaml", b), map[string]int{"a.yaml:1:if:true": 1, "a.yaml:1:if:false": 0}; !reflect.DeepEqual(got, want) {
+		t.Errorf("rendering b.yaml: %v\nwant %v", got, want)
+	}
+}

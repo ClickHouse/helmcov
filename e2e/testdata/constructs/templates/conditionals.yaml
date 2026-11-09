@@ -18,3 +18,4 @@ data:
   debugReplicas: "many"
   {{- end }}
   {{- end }}
+  sides: x{{ if .Values.debug }}d{{ end }}{{ if .Values.featureA }}a{{ end }}

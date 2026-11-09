@@ -1,8 +1,10 @@
 package instrumentation
 
 import (
+	"cmp"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -82,19 +84,35 @@ func coverageFuncs(trace *Trace) template.FuncMap {
 // define, and registers their lines and branches at zero. The top level of a
 // helper file never renders, so it is left out.
 func instrumentTemplates(root *template.Template, target string, sources map[string]string, trace *Trace) {
+	var trees []*parse.Tree
 	for _, tmpl := range root.Templates() {
 		// Templates() only returns parsed templates, so Tree is always set.
-		tree := tmpl.Tree
-		isDefine := tmpl.Name() != tree.ParseName
-		if !isDefine && tmpl.Name() != target {
-			continue
+		isDefine := tmpl.Name() != tmpl.ParseName
+		if isDefine || tmpl.Name() == target {
+			trees = append(trees, tmpl.Tree)
 		}
-		instrumentTree(tree, tree.ParseName, sources[tree.ParseName], trace)
+	}
+	// Defines in source order, then the target's top level, which only its own render has,
+	// so a define's numbers are the same whichever template is rendering.
+	topLevel := func(t *parse.Tree) int {
+		if t.Name == t.ParseName {
+			return 1
+		}
+		return 0
+	}
+	slices.SortFunc(trees, func(a, b *parse.Tree) int {
+		return cmp.Or(cmp.Compare(a.ParseName, b.ParseName), cmp.Compare(topLevel(a), topLevel(b)), cmp.Compare(a.Root.Pos, b.Root.Pos))
+	})
+	seen := map[string]int{}
+	for _, tree := range trees {
+		instrumentTree(tree, tree.ParseName, sources[tree.ParseName], trace, seen)
 	}
 }
 
-func instrumentTree(tree *parse.Tree, file, src string, trace *Trace) {
-	in := instrumenter{tree: tree, file: file, src: src, trace: trace}
+// instrumentTree instruments one parse tree. seen counts constructs per line and
+// kind across the trees of one render.
+func instrumentTree(tree *parse.Tree, file, src string, trace *Trace, seen map[string]int) {
+	in := instrumenter{tree: tree, file: file, src: src, trace: trace, seen: seen}
 	in.list(tree.Root)
 }
 
@@ -103,6 +121,7 @@ type instrumenter struct {
 	file  string
 	src   string
 	trace *Trace
+	seen  map[string]int
 }
 
 // list rewrites a list in place, putting a line marker before each node and
@@ -146,6 +165,7 @@ func (in *instrumenter) name(node parse.Node, construct string) string {
 
 func (in *instrumenter) branch(b *parse.BranchNode, construct, taken, notTaken string) {
 	line := in.line(b.Position())
+	construct = in.numbered(line, construct)
 	takenKey := in.registerBranch(line, construct, taken)
 	notTakenKey := in.registerBranch(line, construct, notTaken)
 	in.pipe(b.Pipe)
@@ -167,25 +187,29 @@ func (in *instrumenter) pipe(p *parse.PipeNode) {
 		return
 	}
 	for i, cmd := range p.Cmds {
+		ident, ok := cmd.Args[0].(*parse.IdentifierNode)
+		line := in.line(cmd.Position())
+		name := ""
+		if ok && (slices.Contains([]string{"default", "ternary", "coalesce"}, ident.Ident) || tracksOperands(cmd, ident.Ident)) {
+			name = in.numbered(line, ident.Ident) // before the arguments, so an outer call numbers first
+		}
 		for _, arg := range cmd.Args {
 			in.nested(arg)
 		}
-		ident, ok := cmd.Args[0].(*parse.IdentifierNode)
-		if !ok {
+		if name == "" {
 			continue
 		}
-		line := in.line(cmd.Position())
-		prefix := fmt.Sprintf("%s:%d:%s", in.file, line, ident.Ident)
+		prefix := fmt.Sprintf("%s:%d:%s", in.file, line, name)
 		switch ident.Ident {
 		case "and", "or":
-			in.operands(cmd, ident.Ident, line)
+			in.operands(cmd, name, line)
 		case "default":
-			in.registerBranch(line, "default", "value")
-			in.registerBranch(line, "default", "fallback")
+			in.registerBranch(line, name, "value")
+			in.registerBranch(line, name, "fallback")
 			in.replace(cmd, defaultFunc, prefix)
 		case "ternary":
-			in.registerBranch(line, "ternary", "true")
-			in.registerBranch(line, "ternary", "false")
+			in.registerBranch(line, name, "true")
+			in.registerBranch(line, name, "false")
 			in.replace(cmd, ternaryFunc, prefix)
 		case "coalesce":
 			args := len(cmd.Args) - 1
@@ -193,7 +217,7 @@ func (in *instrumenter) pipe(p *parse.PipeNode) {
 				args++ // the piped value is the last argument
 			}
 			for n := 1; n <= args; n++ {
-				in.registerBranch(line, fmt.Sprintf("coalesce(%d)", n), "used")
+				in.registerBranch(line, fmt.Sprintf("%s(%d)", name, n), "used")
 			}
 			in.replace(cmd, coalesceFunc, prefix)
 		}
@@ -209,11 +233,26 @@ func (in *instrumenter) nested(node parse.Node) {
 	}
 }
 
+// tracksOperands reports whether cmd is an and/or with an operand that is not a literal.
+func tracksOperands(cmd *parse.CommandNode, op string) bool {
+	if op != "and" && op != "or" {
+		return false
+	}
+	return slices.ContainsFunc(cmd.Args[1:], func(arg parse.Node) bool { return !isLiteral(arg) })
+}
+
+func isLiteral(node parse.Node) bool {
+	switch node.(type) {
+	case *parse.NilNode, *parse.BoolNode, *parse.NumberNode, *parse.StringNode:
+		return true
+	}
+	return false
+}
+
 // operands wraps each and/or operand so it is recorded only if and/or evaluates it.
 func (in *instrumenter) operands(cmd *parse.CommandNode, op string, line int) {
 	for i, arg := range cmd.Args[1:] {
-		switch arg.(type) {
-		case *parse.NilNode, *parse.BoolNode, *parse.NumberNode, *parse.StringNode:
+		if isLiteral(arg) {
 			continue // a literal has only one outcome, so it is not a branch
 		}
 		construct := fmt.Sprintf("%s(%d)", op, i+1)
@@ -227,6 +266,17 @@ func (in *instrumenter) operands(cmd *parse.CommandNode, op string, line int) {
 // replace swaps a Sprig call for its recording version, keeping the arguments.
 func (in *instrumenter) replace(cmd *parse.CommandNode, fn, key string) {
 	cmd.Args = append(in.command(cmd.Position(), fn, key).Args, cmd.Args[1:]...)
+}
+
+// numbered returns kind for the first construct of that kind on a line and
+// kind#N for the Nth after it, so constructs that share a line keep separate keys.
+func (in *instrumenter) numbered(line int, kind string) string {
+	id := fmt.Sprintf("%s:%d:%s", in.file, line, kind)
+	in.seen[id]++
+	if n := in.seen[id]; n > 1 {
+		return fmt.Sprintf("%s#%d", kind, n)
+	}
+	return kind
 }
 
 // registerLine adds a line key at zero hits, keeping any hits already recorded.
