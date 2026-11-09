@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -235,6 +236,10 @@ func expandTemplates(chartPath string, entries []string) ([]string, error) {
 		match := regexp.MustCompile("^" + strings.ReplaceAll(quoted, `\*`, ".*") + "$")
 		matched := false
 		for _, path := range available {
+			// Only a charts/ pattern reaches subchart templates, so "**" keeps matching the chart's own.
+			if strings.HasPrefix(path, "charts/") && !strings.HasPrefix(pattern, "charts") {
+				continue
+			}
 			if match.MatchString(path) {
 				expanded = appendUnique(expanded, path)
 				matched = true
@@ -254,18 +259,32 @@ func appendUnique(list []string, item string) []string {
 	return append(list, item)
 }
 
-// templatePaths lists the chart's renderable templates as "templates/..." paths, sorted.
+// templatePaths lists the renderable templates of the chart and its unpacked
+// subcharts as paths from the chart root, such as "charts/sub/templates/a.yaml", sorted.
 func templatePaths(chartPath string) ([]string, error) {
+	roots := []string{filepath.Join(chartPath, "templates")}
+	subs, err := unpackedSubcharts(chartPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, sub := range subs {
+		roots = append(roots, filepath.Join(sub.Path, "templates"))
+	}
 	var paths []string
-	root := filepath.Join(chartPath, "templates")
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || strings.HasPrefix(entry.Name(), "_") || !isTemplateFile(path) {
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || strings.HasPrefix(entry.Name(), "_") || !isTemplateFile(path) {
+				return err
+			}
+			rel, err := filepath.Rel(chartPath, path)
+			paths = append(paths, filepath.ToSlash(rel))
 			return err
+		})
+		// No templates/ means no templates; a glob that then matches nothing still fails.
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
 		}
-		rel, err := filepath.Rel(chartPath, path)
-		paths = append(paths, filepath.ToSlash(rel))
-		return err
-	})
+	}
 	slices.Sort(paths)
-	return paths, err
+	return paths, nil
 }

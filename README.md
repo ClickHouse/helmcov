@@ -162,6 +162,13 @@ To run the CLI in CI without the action, download a release or use
 Branch keys include only the line, so two constructs of the same kind on one
 line share keys and their hits add up.
 
+A suite can list a subchart's templates as `charts/<subchart>/templates/<file>`,
+or a glob of them. An unpacked subchart renders as Helm renders it, with its
+own values, the parent's values under its name and globals, its `Chart.yaml`,
+helpers and `.Files`. Templates of a packaged dependency (`charts/*.tgz`) or an
+aliased one are skipped, since helmcov has no unpacked source for them. Nested
+subcharts render with the parent chart's context.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md); coding agents should read
