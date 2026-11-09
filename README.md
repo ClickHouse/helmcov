@@ -43,6 +43,9 @@ Branches are tracked for:
 - whether `default` used its fallback, which side `ternary` took, and which
   `coalesce` argument was used
 
+Each construct has its own keys, including two of the same kind on one line:
+the second and later are numbered, as in `if#2:true`.
+
 Lines that hold only `define`, `else` or `end`, comments, and blank lines are
 not counted. Strings rendered through `tpl` are reported per file but left out
 of the totals.
@@ -156,11 +159,6 @@ To run the CLI in CI without the action, download a release or use
   place of Go files, for tools that merge or diff profiles. `go tool cover`
   itself needs Go sources and cannot render it.
 - The markdown report is what the action posts on pull requests.
-
-## Limitations
-
-Branch keys include only the line, so two constructs of the same kind on one
-line share keys and their hits add up.
 
 ## Contributing
 

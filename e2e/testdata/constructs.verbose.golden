@@ -1,4 +1,4 @@
-helmcov: target=testdata/constructs tests=testdata/constructs/tests formats=cobertura,go suites=2 line-coverage=92.21% branch-coverage=66.67%
+helmcov: target=testdata/constructs tests=testdata/constructs/tests formats=cobertura,go suites=2 line-coverage=92.31% branch-coverage=67.24%
 coverage details:
 template: testdata/constructs/templates/_helpers.tpl
   line-coverage: 71.43% (5/7)
@@ -8,12 +8,13 @@ template: testdata/constructs/templates/_helpers.tpl
   uncovered branches:
     - testdata/constructs/templates/_helpers.tpl:2 "{{- if .Values.nameOverride }}" (if:true)
 template: testdata/constructs/templates/conditionals.yaml
-  line-coverage: 100.00% (15/15)
+  line-coverage: 100.00% (16/16)
   uncovered lines:
     - none
   uncovered branches:
     - testdata/constructs/templates/conditionals.yaml:13 "{{- if and .Values.featureA .Values.featureB }}" (and(1):false)
     - testdata/constructs/templates/conditionals.yaml:17 "{{- if gt (int .Values.replicas) 1 }}" (if:false)
+    - testdata/constructs/templates/conditionals.yaml:21 "sides: x{{ if .Values.debug }}d{{ end }}{{ if .Values.featureA }}a{{ end }}" (if#2:false)
 template: testdata/constructs/templates/functions.yaml
   line-coverage: 95.45% (21/22)
   uncovered lines:
