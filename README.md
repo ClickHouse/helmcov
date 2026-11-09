@@ -21,6 +21,12 @@ and branches run. It renders with:
 - up to `--max-scenarios` generated variants per suite that flip booleans and
   empty or fill lists and maps, to reach branches the suites miss
 
+No test asserts on what the suite's own values or a generated variant render,
+so helmcov also reports the coverage reached by the tests' renders alone. It
+appears next to the totals in the summary line (`line-coverage-tests`,
+`branch-coverage-tests`) and the markdown report. A wide gap between the two
+means a branch renders but nothing checks it. The thresholds apply to the totals.
+
 Rendering matches helm-unittest. The default release is `RELEASE-NAME` in
 `NAMESPACE`, with Kubernetes 1.20 and no API versions, and any `release`,
 `capabilities` and `chart` a suite or test sets apply on top. `templates` globs
@@ -91,6 +97,7 @@ helmcov --chart charts/my-app --threshold 80 --branch-threshold 70 --verbose
 | `--comment-marker` | `helmcov-comment` | HTML comment that identifies the markdown report |
 | `--max-scenarios` | `20` | Value scenarios per suite, including the suite's own values. `1` adds no generated variants, so coverage is close to what the tests alone reach |
 | `--seed` | `42` | Seed for choosing generated variants |
+| `--baseline` | | Cobertura XML from an earlier run, such as the base branch. The markdown report shows the change from it |
 | `--kube-version` | `1.20.0` | Kubernetes version for suites that set none |
 | `--verbose` | off | Print each file's uncovered lines and branches with their source |
 | `--version` | | Print the helmcov version and exit |
@@ -126,6 +133,14 @@ jobs:
 
 For a repository with many charts, use `charts: charts` instead of `chart`.
 
+On a pull request the comment shows the change from the base commit, which
+the action measures in a second run with the same binary and settings. That
+roughly doubles the run time; set `compare-base: "false"` to skip it. When the
+base cannot render, for example because the PR adds the chart, the comment
+shows the totals without a change. The base commit is fetched with the credentials
+`actions/checkout` saved, and the repository must be checked out at the
+workspace root; otherwise the comparison is skipped.
+
 | Input | Default | Meaning |
 |-------|---------|---------|
 | `chart` | | Chart directory |
@@ -138,6 +153,7 @@ For a repository with many charts, use `charts: charts` instead of `chart`.
 | `comment-marker` | `helmcov-comment` | Identifies the comment to update |
 | `token` | `github.token` | Token used to comment |
 | `file-summary` | `false` | Add a per-file table to the comment |
+| `compare-base` | `true` | On pull requests, also measure the base commit and show the coverage change in the comment |
 | `include-tpl-sources` | `false` | List `tpl` sources in the comment |
 | `markdown-file` | `helmcov-coverage.md` | Where to write the markdown report |
 | `max-scenarios` | `20` | As `--max-scenarios` |
@@ -145,7 +161,8 @@ For a repository with many charts, use `charts: charts` instead of `chart`.
 | `kube-version` | `1.20.0` | As `--kube-version` |
 | `repository` | `ClickHouse/helmcov` | Repository to download releases from |
 
-Outputs: `line-coverage`, `branch-coverage` (percentages) and `markdown-file`.
+Outputs: `line-coverage`, `branch-coverage`, `line-coverage-tests`,
+`branch-coverage-tests` (percentages) and `markdown-file`.
 
 To run the CLI in CI without the action, download a release or use
 `go install`, then upload `coverage.xml` to your coverage service.
@@ -159,6 +176,15 @@ To run the CLI in CI without the action, download a release or use
   place of Go files, for tools that merge or diff profiles. `go tool cover`
   itself needs Go sources and cannot render it.
 - The markdown report is what the action posts on pull requests.
+
+## Limitations
+
+A suite can list a subchart's templates as `charts/<subchart>/templates/<file>`,
+or a glob of them. An unpacked subchart renders as Helm renders it, with its
+own values, the parent's values under its name and globals, its `Chart.yaml`,
+helpers and `.Files`. Templates of a packaged dependency (`charts/*.tgz`) or an
+aliased one are skipped, since helmcov has no unpacked source for them. Nested
+subcharts render with the parent chart's context.
 
 ## Contributing
 

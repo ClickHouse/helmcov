@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -38,6 +40,7 @@ func Run(args []string, stdout io.Writer) error {
 	}
 
 	traces := make([]instrumentation.Trace, 0, 32)
+	var testTraces []instrumentation.Trace
 	totalSuites := 0
 	for _, target := range targets {
 		bundle, loadErr := chartloader.LoadBundle(target.ChartPath, target.TestsPath)
@@ -66,12 +69,22 @@ func Run(args []string, stdout io.Writer) error {
 				if ok {
 					traces = append(traces, trace)
 				}
+				if ok && job.test {
+					testTraces = append(testTraces, trace)
+				} else if ok {
+					testTraces = append(testTraces, withoutHits(trace))
+				}
 			}
 		}
 	}
 
 	report := coverage.FromTraces(traces)
-	if err := writeRequestedFormats(cfg, report); err != nil {
+	testReport := coverage.FromTraces(testTraces)
+	baseline, err := readBaseline(cfg.BaselinePath)
+	if err != nil {
+		return err
+	}
+	if err := writeRequestedFormats(cfg, report, testReport, baseline); err != nil {
 		return err
 	}
 
@@ -93,13 +106,16 @@ func Run(args []string, stdout io.Writer) error {
 	sort.Strings(formats)
 	_, err = fmt.Fprintf(
 		stdout,
-		"helmcov: target=%s tests=%s formats=%s suites=%d line-coverage=%.2f%% branch-coverage=%.2f%%\n",
+		// The tests-only names must not end in "line-coverage=", which the action's sed matches greedily.
+		"helmcov: target=%s tests=%s formats=%s suites=%d line-coverage=%.2f%% branch-coverage=%.2f%% line-coverage-tests=%.2f%% branch-coverage-tests=%.2f%%\n",
 		targetLabel(cfg),
 		testsLabel(cfg),
 		strings.Join(formats, ","),
 		totalSuites,
 		lineCoverage,
 		branchCoverage,
+		testReport.LineRate()*100,
+		testReport.BranchRate()*100,
 	)
 	if err != nil {
 		return err
@@ -110,6 +126,19 @@ func Run(args []string, stdout io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// withoutHits keeps a trace's keys at zero, so what only scenarios render still
+// counts against the tests-only coverage.
+func withoutHits(trace instrumentation.Trace) instrumentation.Trace {
+	zero := instrumentation.Trace{Lines: map[string]int{}, Branches: map[string]int{}}
+	for key := range trace.Lines {
+		zero.Lines[key] = 0
+	}
+	for key := range trace.Branches {
+		zero.Branches[key] = 0
+	}
+	return zero
 }
 
 // helmUnittestKubeVersion is the Kubernetes version helm-unittest renders with by default.
@@ -145,6 +174,14 @@ func suiteRenders(suite chartloader.Suite, cfg Config) []renderJob {
 type templateSource struct {
 	file, content string
 	skip          bool
+	sub           *subchartRender
+}
+
+// subchartRender is the context Helm gives a subchart's templates in place of the parent's.
+type subchartRender struct {
+	chart     chartloader.Subchart
+	files     chartloader.ChartFiles
+	templates map[string]string
 }
 
 type chartRenderer struct {
@@ -166,17 +203,22 @@ func (c chartRenderer) trace(job renderJob) (instrumentation.Trace, bool, error)
 	meta := c.meta
 	meta.Version = cmp.Or(job.context.ChartVersion, meta.Version)
 	meta.AppVersion = cmp.Or(job.context.ChartAppVersion, meta.AppVersion)
+	values, chartPath, files, templates := job.values, c.chartPath, c.files, c.templates
+	if src.sub != nil {
+		meta, chartPath, files, templates = src.sub.chart.Meta, src.sub.chart.Path, src.sub.files, src.sub.templates
+		values = src.sub.chart.ScopeValues(job.values)
+	}
 	exec := instrumentation.Executor{Lookup: job.context.Lookup, Strict: job.test}
 	trace, _, err := exec.RenderAndTrace(src.file, src.content, chartloader.HelmRenderValues(chartloader.RenderOptions{
 		Chart:        meta,
-		Values:       job.values,
-		ChartPath:    c.chartPath,
+		Values:       values,
+		ChartPath:    chartPath,
 		TemplatePath: src.file,
 		KubeVersion:  cmp.Or(job.context.KubeVersion, c.kubeVersion, helmUnittestKubeVersion),
-		Files:        c.files,
+		Files:        files,
 		Release:      job.context.Release,
 		APIVersions:  job.context.APIVersions,
-	}), c.templates)
+	}), templates)
 	if err != nil {
 		// A test that asserts failedTemplate expects this; the lines run before the failure still count.
 		if job.expectFail && errors.Is(err, instrumentation.ErrExecute) {
@@ -204,8 +246,31 @@ func (c chartRenderer) source(templatePath string) (templateSource, error) {
 	if err != nil {
 		return templateSource{}, fmt.Errorf("read template %s: %w", file, err)
 	}
-	c.sources[templatePath] = templateSource{file: file, content: string(content)}
+	sub, err := c.subchart(templatePath)
+	if err != nil {
+		return templateSource{}, err
+	}
+	c.sources[templatePath] = templateSource{file: file, content: string(content), sub: sub}
 	return c.sources[templatePath], nil
+}
+
+// subchart loads the subchart that holds templatePath, or returns nil for the parent's own templates.
+func (c chartRenderer) subchart(templatePath string) (*subchartRender, error) {
+	chart, ok, err := chartloader.LoadSubchartFor(c.chartPath, templatePath)
+	if err != nil || !ok {
+		return nil, err
+	}
+	files, err := chartloader.LoadChartFiles(chart.Path)
+	if err != nil {
+		return nil, fmt.Errorf("subchart %s: %w", chart.Meta.Name, err)
+	}
+	templates, err := chartloader.LoadTemplateFiles(chart.Path)
+	if err != nil {
+		return nil, fmt.Errorf("subchart %s: %w", chart.Meta.Name, err)
+	}
+	// Helm parses parent and subchart templates together, so either can include the other's defines.
+	maps.Copy(templates, c.templates)
+	return &subchartRender{chart: chart, files: files, templates: templates}, nil
 }
 
 type target struct {
@@ -249,7 +314,7 @@ func testsLabel(cfg Config) string {
 	return cfg.TestsPath
 }
 
-func writeRequestedFormats(cfg Config, report coverage.Report) error {
+func writeRequestedFormats(cfg Config, report, testReport coverage.Report, baseline *reporters.Rates) error {
 	for _, format := range cfg.Formats {
 		switch format {
 		case "go":
@@ -272,6 +337,8 @@ func writeRequestedFormats(cfg Config, report coverage.Report) error {
 					CommentMarker:     cfg.CommentMarker,
 					ShowFileSummary:   cfg.MarkdownFileSummary,
 					IncludeTplSources: cfg.MarkdownIncludeTpl,
+					Tests:             &testReport,
+					Baseline:          baseline,
 				})
 			}); err != nil {
 				return fmt.Errorf("write markdown: %w", err)
@@ -281,6 +348,22 @@ func writeRequestedFormats(cfg Config, report coverage.Report) error {
 		}
 	}
 	return nil
+}
+
+// readBaseline reads the --baseline report, or returns nil when none was given.
+func readBaseline(path string) (*reporters.Rates, error) {
+	if path == "" {
+		return nil, nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read baseline: %w", err)
+	}
+	rates, err := reporters.ReadCoberturaRates(bytes.NewReader(content))
+	if err != nil {
+		return nil, fmt.Errorf("read baseline %s: %w", path, err)
+	}
+	return &rates, nil
 }
 
 func writeToFile(path string, writeFn func(io.Writer) error) (err error) {

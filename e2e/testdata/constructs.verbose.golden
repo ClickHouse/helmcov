@@ -1,4 +1,4 @@
-helmcov: target=testdata/constructs tests=testdata/constructs/tests formats=cobertura,go suites=2 line-coverage=92.31% branch-coverage=67.24%
+helmcov: target=testdata/constructs tests=testdata/constructs/tests formats=cobertura,go suites=2 line-coverage=92.31% branch-coverage=67.24% line-coverage-tests=91.03% branch-coverage-tests=65.52%
 coverage details:
 template: testdata/constructs/templates/_helpers.tpl
   line-coverage: 71.43% (5/7)

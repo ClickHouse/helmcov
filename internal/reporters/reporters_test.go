@@ -194,3 +194,129 @@ func TestWriteMarkdownReportsThresholdMet(t *testing.T) {
 		t.Fatalf("expected threshold met marker, got:\n%s", buf.String())
 	}
 }
+
+func TestWriteMarkdownShowsTestsOnlyColumn(t *testing.T) {
+	t.Parallel()
+
+	all := coverage.Report{Files: map[string]coverage.FileCoverage{
+		"t.yaml": {Lines: map[int]int{1: 1, 2: 1, 3: 1, 4: 0}, Branches: map[string]int{"1:if:true": 1, "1:if:false": 1}},
+	}}
+	tests := coverage.Report{Files: map[string]coverage.FileCoverage{
+		"t.yaml": {Lines: map[int]int{1: 1, 2: 0, 3: 0, 4: 0}, Branches: map[string]int{"1:if:true": 0, "1:if:false": 1}},
+	}}
+	var buf bytes.Buffer
+	if err := WriteMarkdown(all, &buf, MarkdownOptions{Tests: &tests, Threshold: 70}); err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	for _, want := range []string{
+		"| Metric | Value | Tests only |\n|--------|------:|-----------:|\n",
+		"| Line coverage | 75.00% | 25.00% |\n",
+		"| Branch coverage | 100.00% | 50.00% |\n",
+		"| Line threshold | 70% (met) |\n",
+		"Tests only counts what helm-unittest tests render.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	buf.Reset()
+	if err := WriteMarkdown(all, &buf, MarkdownOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "Tests only") {
+		t.Errorf("tests-only column without a tests report:\n%s", buf.String())
+	}
+}
+
+func TestReadCoberturaRatesReadsWhatHelmcovWrites(t *testing.T) {
+	t.Parallel()
+
+	report := coverage.Report{Files: map[string]coverage.FileCoverage{
+		"t.yaml": {Lines: map[int]int{1: 1, 2: 0, 3: 1}, Branches: map[string]int{"1:if:true": 1, "1:if:false": 0, "2:if:true": 0, "2:if:false": 0}},
+	}}
+	var buf bytes.Buffer
+	if err := WriteCoberturaXML(report, &buf); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadCoberturaRates(&buf)
+	if err != nil || got != (Rates{Line: 0.6667, Branch: 0.25}) {
+		t.Errorf("ReadCoberturaRates() = %+v, %v", got, err)
+	}
+	for name, xml := range map[string]string{
+		"not XML":         "nope",
+		"bad line-rate":   `<coverage line-rate="x" branch-rate="0.5"/>`,
+		"bad branch-rate": `<coverage line-rate="0.5" branch-rate=""/>`,
+	} {
+		if _, err := ReadCoberturaRates(strings.NewReader(xml)); err == nil {
+			t.Errorf("%s: want an error", name)
+		}
+	}
+}
+
+func TestWriteMarkdownShowsChangeFromBaseline(t *testing.T) {
+	t.Parallel()
+
+	report := coverage.Report{Files: map[string]coverage.FileCoverage{
+		"t.yaml": {Lines: map[int]int{1: 1, 2: 1, 3: 0}, Branches: map[string]int{"1:if:true": 1, "1:if:false": 0}},
+	}}
+	cases := []struct {
+		name     string
+		report   *coverage.Report
+		baseline Rates
+		opts     MarkdownOptions
+		want     []string
+	}{
+		{
+			name:     "up and down",
+			baseline: Rates{Line: 0.5, Branch: 0.75},
+			want:     []string{"| Line coverage | 66.67% (+16.67) |\n", "| Branch coverage | 50.00% (-25.00) |\n"},
+		},
+		{
+			name:     "unchanged at the shown precision",
+			baseline: Rates{Line: 0.6667, Branch: 0.5},
+			want:     []string{"| Line coverage | 66.67% (+0.00) |\n", "| Branch coverage | 50.00% (+0.00) |\n"},
+		},
+		{
+			name:     "unchanged at a rounding tie",
+			report:   &coverage.Report{Files: map[string]coverage.FileCoverage{"t.yaml": {Lines: tieLines(), Branches: map[string]int{}}}},
+			baseline: Rates{Line: 0.0312},
+			want:     []string{"| Line coverage | 3.12% (+0.00) |\n"},
+		},
+		{
+			name:     "next to the tests-only column",
+			baseline: Rates{Line: 1, Branch: 0},
+			opts:     MarkdownOptions{Tests: &coverage.Report{}},
+			want:     []string{"| Line coverage | 66.67% (-33.33) | 0.00% |\n", "| Branch coverage | 50.00% (+50.00) | 0.00% |\n"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			opts := tc.opts
+			opts.Baseline = &tc.baseline
+			r := report
+			if tc.report != nil {
+				r = *tc.report
+			}
+			var buf bytes.Buffer
+			if err := WriteMarkdown(r, &buf, opts); err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(buf.String(), want) {
+					t.Errorf("missing %q in:\n%s", want, buf.String())
+				}
+			}
+		})
+	}
+}
+
+// tieLines covers 1 of 32 lines, 3.125%, which rounds differently at two and four decimals.
+func tieLines() map[int]int {
+	lines := map[int]int{1: 1}
+	for i := 2; i <= 32; i++ {
+		lines[i] = 0
+	}
+	return lines
+}

@@ -14,6 +14,10 @@ type MarkdownOptions struct {
 	CommentMarker     string
 	ShowFileSummary   bool
 	IncludeTplSources bool
+	// Tests is the coverage from test renders alone, without generated scenarios. Nil omits it.
+	Tests *coverage.Report
+	// Baseline adds the change from an earlier run, such as the base branch, to the totals.
+	Baseline *Rates
 }
 
 func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOptions) error {
@@ -24,15 +28,24 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 
 	lineRate := report.LineRate() * 100
 	branchRate := report.BranchRate() * 100
+	lineChange := change(report.LineRate(), opts.Baseline, func(r Rates) float64 { return r.Line })
+	branchChange := change(report.BranchRate(), opts.Baseline, func(r Rates) float64 { return r.Branch })
 	files := markdownFiles(report, opts.IncludeTplSources)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "<!-- %s -->\n\n", marker)
 	b.WriteString("## Helm template coverage\n\n")
-	b.WriteString("| Metric | Value |\n")
-	b.WriteString("|--------|------:|\n")
-	fmt.Fprintf(&b, "| Line coverage | %.2f%% |\n", lineRate)
-	fmt.Fprintf(&b, "| Branch coverage | %.2f%% |\n", branchRate)
+	if opts.Tests == nil {
+		b.WriteString("| Metric | Value |\n")
+		b.WriteString("|--------|------:|\n")
+		fmt.Fprintf(&b, "| Line coverage | %.2f%%%s |\n", lineRate, lineChange)
+		fmt.Fprintf(&b, "| Branch coverage | %.2f%%%s |\n", branchRate, branchChange)
+	} else {
+		b.WriteString("| Metric | Value | Tests only |\n")
+		b.WriteString("|--------|------:|-----------:|\n")
+		fmt.Fprintf(&b, "| Line coverage | %.2f%%%s | %.2f%% |\n", lineRate, lineChange, opts.Tests.LineRate()*100)
+		fmt.Fprintf(&b, "| Branch coverage | %.2f%%%s | %.2f%% |\n", branchRate, branchChange, opts.Tests.BranchRate()*100)
+	}
 	if opts.Threshold > 0 {
 		fmt.Fprintf(&b, "| Line threshold | %.0f%% %s |\n", opts.Threshold, thresholdStatus(lineRate, opts.Threshold))
 	}
@@ -40,6 +53,9 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 		fmt.Fprintf(&b, "| Branch threshold | %.0f%% %s |\n", opts.BranchThreshold, thresholdStatus(branchRate, opts.BranchThreshold))
 	}
 	b.WriteString("\n")
+	if opts.Tests != nil {
+		b.WriteString("Tests only counts what helm-unittest tests render. The rest comes from generated value scenarios, which no test asserts on.\n\n")
+	}
 
 	if opts.ShowFileSummary && len(files) > 0 {
 		b.WriteString("### Per-file summary\n\n")
