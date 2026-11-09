@@ -28,10 +28,15 @@ jobs:
         env:
           LINE: ${{ steps.helmcov.outputs.line-coverage }}
           BRANCH: ${{ steps.helmcov.outputs.branch-coverage }}
+          LINE_TESTS: ${{ steps.helmcov.outputs.line-coverage-tests }}
+          BRANCH_TESTS: ${{ steps.helmcov.outputs.branch-coverage-tests }}
           MARKDOWN: ${{ steps.helmcov.outputs.markdown-file }}
         run: |
-          echo "line=$LINE branch=$BRANCH markdown=$MARKDOWN"
-          [[ "$LINE" =~ ^[0-9]+\.[0-9]+$ && "$BRANCH" =~ ^[0-9]+\.[0-9]+$ && -f "$MARKDOWN" ]]
+          echo "line=$LINE branch=$BRANCH line-tests=$LINE_TESTS branch-tests=$BRANCH_TESTS markdown=$MARKDOWN"
+          for pct in "$LINE" "$BRANCH" "$LINE_TESTS" "$BRANCH_TESTS"; do
+            [[ "$pct" =~ ^[0-9]+\.[0-9]+$ ]]
+          done
+          [[ -f "$MARKDOWN" ]]
 
   monorepo-coverage:
     runs-on: ubuntu-latest

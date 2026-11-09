@@ -194,3 +194,37 @@ func TestWriteMarkdownReportsThresholdMet(t *testing.T) {
 		t.Fatalf("expected threshold met marker, got:\n%s", buf.String())
 	}
 }
+
+func TestWriteMarkdownShowsTestsOnlyColumn(t *testing.T) {
+	t.Parallel()
+
+	all := coverage.Report{Files: map[string]coverage.FileCoverage{
+		"t.yaml": {Lines: map[int]int{1: 1, 2: 1, 3: 1, 4: 0}, Branches: map[string]int{"1:if:true": 1, "1:if:false": 1}},
+	}}
+	tests := coverage.Report{Files: map[string]coverage.FileCoverage{
+		"t.yaml": {Lines: map[int]int{1: 1, 2: 0, 3: 0, 4: 0}, Branches: map[string]int{"1:if:true": 0, "1:if:false": 1}},
+	}}
+	var buf bytes.Buffer
+	if err := WriteMarkdown(all, &buf, MarkdownOptions{Tests: &tests, Threshold: 70}); err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	for _, want := range []string{
+		"| Metric | Value | Tests only |\n|--------|------:|-----------:|\n",
+		"| Line coverage | 75.00% | 25.00% |\n",
+		"| Branch coverage | 100.00% | 50.00% |\n",
+		"| Line threshold | 70% (met) |\n",
+		"Tests only counts what helm-unittest tests render.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	buf.Reset()
+	if err := WriteMarkdown(all, &buf, MarkdownOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "Tests only") {
+		t.Errorf("tests-only column without a tests report:\n%s", buf.String())
+	}
+}
