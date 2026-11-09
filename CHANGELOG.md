@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.8.0](https://github.com/ClickHouse/helmcov/compare/v0.7.0...v0.8.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **instrumentation:** give same-line constructs their own branch keys ([#29](https://github.com/ClickHouse/helmcov/issues/29))
+
+### Features
+
+* **instrumentation:** give same-line constructs their own branch keys ([#29](https://github.com/ClickHouse/helmcov/issues/29)) ([6287006](https://github.com/ClickHouse/helmcov/commit/62870067a198c178dbc7098398d15cde6abb42bd))
+* report coverage reached by tests alone ([#30](https://github.com/ClickHouse/helmcov/issues/30)) ([a9efbf8](https://github.com/ClickHouse/helmcov/commit/a9efbf843769a4f1cdc3abdbfe0ae8d78cb3e659))
+* show coverage change from the base commit on pull requests ([#31](https://github.com/ClickHouse/helmcov/issues/31)) ([b0e13a8](https://github.com/ClickHouse/helmcov/commit/b0e13a8641aae1d0195effca5699f8f85543f981))
+
+
+### Bug Fixes
+
+* **action:** expose the coverage outputs ([#28](https://github.com/ClickHouse/helmcov/issues/28)) ([6850ca7](https://github.com/ClickHouse/helmcov/commit/6850ca76554207afa9a9b97f2621b883b9a491ad))
+* render unpacked subchart templates with the subchart's context ([#27](https://github.com/ClickHouse/helmcov/issues/27)) ([a2d6900](https://github.com/ClickHouse/helmcov/commit/a2d6900048c804caafaea4b9d4e3b1d2c23507fe))
+
 ## [0.7.0](https://github.com/ClickHouse/helmcov/compare/v0.6.0...v0.7.0) (2026-11-05)
 
 
