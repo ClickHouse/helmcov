@@ -77,6 +77,12 @@ outputs:
   branch-coverage:
     description: Overall branch coverage percentage.
     value: ${{ steps.run.outputs.branch-coverage }}
+  line-coverage-tests:
+    description: Line coverage percentage from helm-unittest tests alone, without generated scenarios. Empty for releases before it existed.
+    value: ${{ steps.run.outputs.line-coverage-tests }}
+  branch-coverage-tests:
+    description: Branch coverage percentage from helm-unittest tests alone, without generated scenarios. Empty for releases before it existed.
+    value: ${{ steps.run.outputs.branch-coverage-tests }}
   markdown-file:
     description: Path to the generated markdown coverage report.
     value: ${{ steps.run.outputs.markdown-file }}

@@ -14,6 +14,8 @@ type MarkdownOptions struct {
 	CommentMarker     string
 	ShowFileSummary   bool
 	IncludeTplSources bool
+	// Tests is the coverage from test renders alone, without generated scenarios. Nil omits it.
+	Tests *coverage.Report
 }
 
 func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOptions) error {
@@ -29,10 +31,17 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 	var b strings.Builder
 	fmt.Fprintf(&b, "<!-- %s -->\n\n", marker)
 	b.WriteString("## Helm template coverage\n\n")
-	b.WriteString("| Metric | Value |\n")
-	b.WriteString("|--------|------:|\n")
-	fmt.Fprintf(&b, "| Line coverage | %.2f%% |\n", lineRate)
-	fmt.Fprintf(&b, "| Branch coverage | %.2f%% |\n", branchRate)
+	if opts.Tests == nil {
+		b.WriteString("| Metric | Value |\n")
+		b.WriteString("|--------|------:|\n")
+		fmt.Fprintf(&b, "| Line coverage | %.2f%% |\n", lineRate)
+		fmt.Fprintf(&b, "| Branch coverage | %.2f%% |\n", branchRate)
+	} else {
+		b.WriteString("| Metric | Value | Tests only |\n")
+		b.WriteString("|--------|------:|-----------:|\n")
+		fmt.Fprintf(&b, "| Line coverage | %.2f%% | %.2f%% |\n", lineRate, opts.Tests.LineRate()*100)
+		fmt.Fprintf(&b, "| Branch coverage | %.2f%% | %.2f%% |\n", branchRate, opts.Tests.BranchRate()*100)
+	}
 	if opts.Threshold > 0 {
 		fmt.Fprintf(&b, "| Line threshold | %.0f%% %s |\n", opts.Threshold, thresholdStatus(lineRate, opts.Threshold))
 	}
@@ -40,6 +49,9 @@ func WriteMarkdown(report coverage.Report, writer io.Writer, opts MarkdownOption
 		fmt.Fprintf(&b, "| Branch threshold | %.0f%% %s |\n", opts.BranchThreshold, thresholdStatus(branchRate, opts.BranchThreshold))
 	}
 	b.WriteString("\n")
+	if opts.Tests != nil {
+		b.WriteString("Tests only counts what helm-unittest tests render. The rest comes from generated value scenarios, which no test asserts on.\n\n")
+	}
 
 	if opts.ShowFileSummary && len(files) > 0 {
 		b.WriteString("### Per-file summary\n\n")

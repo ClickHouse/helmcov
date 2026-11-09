@@ -38,6 +38,7 @@ func Run(args []string, stdout io.Writer) error {
 	}
 
 	traces := make([]instrumentation.Trace, 0, 32)
+	var testTraces []instrumentation.Trace
 	totalSuites := 0
 	for _, target := range targets {
 		bundle, loadErr := chartloader.LoadBundle(target.ChartPath, target.TestsPath)
@@ -66,12 +67,18 @@ func Run(args []string, stdout io.Writer) error {
 				if ok {
 					traces = append(traces, trace)
 				}
+				if ok && job.test {
+					testTraces = append(testTraces, trace)
+				} else if ok {
+					testTraces = append(testTraces, withoutHits(trace))
+				}
 			}
 		}
 	}
 
 	report := coverage.FromTraces(traces)
-	if err := writeRequestedFormats(cfg, report); err != nil {
+	testReport := coverage.FromTraces(testTraces)
+	if err := writeRequestedFormats(cfg, report, testReport); err != nil {
 		return err
 	}
 
@@ -93,13 +100,16 @@ func Run(args []string, stdout io.Writer) error {
 	sort.Strings(formats)
 	_, err = fmt.Fprintf(
 		stdout,
-		"helmcov: target=%s tests=%s formats=%s suites=%d line-coverage=%.2f%% branch-coverage=%.2f%%\n",
+		// The tests-only names must not end in "line-coverage=", which the action's sed matches greedily.
+		"helmcov: target=%s tests=%s formats=%s suites=%d line-coverage=%.2f%% branch-coverage=%.2f%% line-coverage-tests=%.2f%% branch-coverage-tests=%.2f%%\n",
 		targetLabel(cfg),
 		testsLabel(cfg),
 		strings.Join(formats, ","),
 		totalSuites,
 		lineCoverage,
 		branchCoverage,
+		testReport.LineRate()*100,
+		testReport.BranchRate()*100,
 	)
 	if err != nil {
 		return err
@@ -110,6 +120,19 @@ func Run(args []string, stdout io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// withoutHits keeps a trace's keys at zero, so what only scenarios render still
+// counts against the tests-only coverage.
+func withoutHits(trace instrumentation.Trace) instrumentation.Trace {
+	zero := instrumentation.Trace{Lines: map[string]int{}, Branches: map[string]int{}}
+	for key := range trace.Lines {
+		zero.Lines[key] = 0
+	}
+	for key := range trace.Branches {
+		zero.Branches[key] = 0
+	}
+	return zero
 }
 
 // helmUnittestKubeVersion is the Kubernetes version helm-unittest renders with by default.
@@ -249,7 +272,7 @@ func testsLabel(cfg Config) string {
 	return cfg.TestsPath
 }
 
-func writeRequestedFormats(cfg Config, report coverage.Report) error {
+func writeRequestedFormats(cfg Config, report, testReport coverage.Report) error {
 	for _, format := range cfg.Formats {
 		switch format {
 		case "go":
@@ -272,6 +295,7 @@ func writeRequestedFormats(cfg Config, report coverage.Report) error {
 					CommentMarker:     cfg.CommentMarker,
 					ShowFileSummary:   cfg.MarkdownFileSummary,
 					IncludeTplSources: cfg.MarkdownIncludeTpl,
+					Tests:             &testReport,
 				})
 			}); err != nil {
 				return fmt.Errorf("write markdown: %w", err)

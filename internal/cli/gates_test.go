@@ -422,3 +422,38 @@ func TestParseConfigBranchThresholdBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestRunReportsCoverageReachedByTestsAlone(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	chart := filepath.Join(base, "chart")
+	writeTestFile(t, filepath.Join(chart, "Chart.yaml"), "apiVersion: v2\nname: demo\nversion: 0.1.0\n")
+	writeTestFile(t, filepath.Join(chart, "values.yaml"), "a: false\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "t.yaml"), "{{- if .Values.a }}\na: on\n{{- end }}\nkind: X\n")
+	writeTestFile(t, filepath.Join(chart, "templates", "u.yaml"), "kind: U\n")
+	// No test targets u.yaml, so only the suite's own render reaches it.
+	writeTestFile(t, filepath.Join(chart, "tests", "t_test.yaml"), "suite: t\ntemplates: [t.yaml, u.yaml]\ntests:\n  - it: renders\n    template: t.yaml\n")
+	markdown := filepath.Join(base, "c.md")
+
+	var stdout bytes.Buffer
+	// The one generated scenario flips a to true, which no test does.
+	err := Run([]string{
+		"--chart", chart, "--max-scenarios", "2", "--format", "markdown", "--markdown-file", markdown,
+	}, &stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "line-coverage=100.00% branch-coverage=100.00% line-coverage-tests=50.00% branch-coverage-tests=50.00%\n"; !strings.HasSuffix(stdout.String(), want) {
+		t.Errorf("summary = %q, want suffix %q", stdout.String(), want)
+	}
+	md, err := os.ReadFile(markdown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"| Line coverage | 100.00% | 50.00% |", "| Branch coverage | 100.00% | 50.00% |"} {
+		if !strings.Contains(string(md), want) {
+			t.Errorf("markdown missing %q:\n%s", want, md)
+		}
+	}
+}

@@ -21,6 +21,12 @@ and branches run. It renders with:
 - up to `--max-scenarios` generated variants per suite that flip booleans and
   empty or fill lists and maps, to reach branches the suites miss
 
+No test asserts on what the suite's own values or a generated variant render,
+so helmcov also reports the coverage reached by the tests' renders alone. It
+appears next to the totals in the summary line (`line-coverage-tests`,
+`branch-coverage-tests`) and the markdown report. A wide gap between the two
+means a branch renders but nothing checks it. The thresholds apply to the totals.
+
 Rendering matches helm-unittest. The default release is `RELEASE-NAME` in
 `NAMESPACE`, with Kubernetes 1.20 and no API versions, and any `release`,
 `capabilities` and `chart` a suite or test sets apply on top. `templates` globs
@@ -142,7 +148,8 @@ For a repository with many charts, use `charts: charts` instead of `chart`.
 | `kube-version` | `1.20.0` | As `--kube-version` |
 | `repository` | `ClickHouse/helmcov` | Repository to download releases from |
 
-Outputs: `line-coverage`, `branch-coverage` (percentages) and `markdown-file`.
+Outputs: `line-coverage`, `branch-coverage`, `line-coverage-tests`,
+`branch-coverage-tests` (percentages) and `markdown-file`.
 
 To run the CLI in CI without the action, download a release or use
 `go install`, then upload `coverage.xml` to your coverage service.
