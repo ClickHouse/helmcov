@@ -339,6 +339,42 @@ tests:
 	}
 }
 
+func TestRunRendersUnpackedSubchartWithItsOwnContext(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	chart := filepath.Join(base, "chart")
+	sub := filepath.Join(chart, "charts", "sub")
+	writeTestFile(t, filepath.Join(chart, "Chart.yaml"), "apiVersion: v2\nname: demo\nversion: 0.1.0\n")
+	writeTestFile(t, filepath.Join(chart, "values.yaml"), "sub:\n  enabled: true\nglobal:\n  region: parent\n")
+	writeTestFile(t, filepath.Join(sub, "Chart.yaml"), "apiVersion: v2\nname: sub\nversion: 0.2.0\n")
+	writeTestFile(t, filepath.Join(sub, "values.yaml"), "enabled: false\nown: from-sub\nglobal:\n  region: sub\n")
+	writeTestFile(t, filepath.Join(sub, "data.txt"), "hello")
+	writeTestFile(t, filepath.Join(sub, "templates", "_helpers.tpl"), `{{- define "sub.own" -}}{{ .Values.own }}{{- end -}}`)
+	writeTestFile(t, filepath.Join(sub, "templates", "s.yaml"), `{{- if .Values.enabled }}
+{{- if eq .Chart.Name "sub" }}chart{{ end }}
+{{- if eq .Values.global.region "parent" }}global{{ end }}
+{{- if eq (include "sub.own" .) "from-sub" }}include{{ end }}
+{{- if eq (.Files.Get "data.txt") "hello" }}files{{ end }}
+{{- end }}
+`)
+	writeTestFile(t, filepath.Join(chart, "tests", "t_test.yaml"), "suite: t\ntemplates: [charts/sub/templates/s.yaml]\ntests:\n  - it: renders\n")
+
+	var stdout bytes.Buffer
+	err := Run([]string{
+		"--chart", chart, "--tests", filepath.Join(chart, "tests"), "--max-scenarios", "1", "--verbose",
+		"--go-coverprofile", filepath.Join(base, "c.out"), "--cobertura-file", filepath.Join(base, "c.xml"),
+	}, &stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Helm renders a subchart with its own values, parent globals, Chart.yaml, helpers and files.
+	got := stdout.String()
+	if strings.Contains(got, "(if:true)") || strings.Count(got, "(if:false)") != 5 {
+		t.Errorf("want every if:true covered and every if:false missed:\n%s", got)
+	}
+}
+
 func TestRunAnswersLookupFromKubernetesProvider(t *testing.T) {
 	t.Parallel()
 

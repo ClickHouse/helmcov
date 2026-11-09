@@ -145,6 +145,9 @@ func LoadBundle(chartPath, testsPath string) (Bundle, error) {
 	if chartValues == nil {
 		chartValues = map[string]any{}
 	}
+	if err := coalesceSubchartDefaults(chartPath, chartValues); err != nil {
+		return Bundle{}, err
+	}
 	bundle.Values = deepCopyMap(chartValues)
 
 	suitePaths, err := DiscoverSuites(testsPath)

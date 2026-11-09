@@ -78,10 +78,19 @@ func ResolveTemplatePath(chartPath, templatePath string) (string, error) {
 // IsPackagedSubchartTemplate reports whether templatePath uses helm-unittest's subchart form,
 // charts/<subchart>/templates/<file>, for a subchart that is not unpacked under chartPath.
 func IsPackagedSubchartTemplate(chartPath, templatePath string) bool {
-	parts := strings.Split(filepath.ToSlash(templatePath), "/")
-	if len(parts) < 4 || parts[0] != "charts" || parts[1] == "" || parts[2] != "templates" {
+	name, ok := subchartName(templatePath)
+	if !ok {
 		return false
 	}
-	info, err := os.Stat(filepath.Join(chartPath, "charts", parts[1]))
+	info, err := os.Stat(filepath.Join(chartPath, "charts", name))
 	return err != nil || !info.IsDir()
+}
+
+// subchartName returns <subchart> from helm-unittest's charts/<subchart>/templates/<file> form.
+func subchartName(templatePath string) (string, bool) {
+	parts := strings.Split(filepath.ToSlash(templatePath), "/")
+	if len(parts) < 4 || parts[0] != "charts" || parts[1] == "" || parts[2] != "templates" {
+		return "", false
+	}
+	return parts[1], true
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -173,6 +174,14 @@ func suiteRenders(suite chartloader.Suite, cfg Config) []renderJob {
 type templateSource struct {
 	file, content string
 	skip          bool
+	sub           *subchartRender
+}
+
+// subchartRender is the context Helm gives a subchart's templates in place of the parent's.
+type subchartRender struct {
+	chart     chartloader.Subchart
+	files     chartloader.ChartFiles
+	templates map[string]string
 }
 
 type chartRenderer struct {
@@ -194,17 +203,22 @@ func (c chartRenderer) trace(job renderJob) (instrumentation.Trace, bool, error)
 	meta := c.meta
 	meta.Version = cmp.Or(job.context.ChartVersion, meta.Version)
 	meta.AppVersion = cmp.Or(job.context.ChartAppVersion, meta.AppVersion)
+	values, chartPath, files, templates := job.values, c.chartPath, c.files, c.templates
+	if src.sub != nil {
+		meta, chartPath, files, templates = src.sub.chart.Meta, src.sub.chart.Path, src.sub.files, src.sub.templates
+		values = src.sub.chart.ScopeValues(job.values)
+	}
 	exec := instrumentation.Executor{Lookup: job.context.Lookup, Strict: job.test}
 	trace, _, err := exec.RenderAndTrace(src.file, src.content, chartloader.HelmRenderValues(chartloader.RenderOptions{
 		Chart:        meta,
-		Values:       job.values,
-		ChartPath:    c.chartPath,
+		Values:       values,
+		ChartPath:    chartPath,
 		TemplatePath: src.file,
 		KubeVersion:  cmp.Or(job.context.KubeVersion, c.kubeVersion, helmUnittestKubeVersion),
-		Files:        c.files,
+		Files:        files,
 		Release:      job.context.Release,
 		APIVersions:  job.context.APIVersions,
-	}), c.templates)
+	}), templates)
 	if err != nil {
 		// A test that asserts failedTemplate expects this; the lines run before the failure still count.
 		if job.expectFail && errors.Is(err, instrumentation.ErrExecute) {
@@ -232,8 +246,31 @@ func (c chartRenderer) source(templatePath string) (templateSource, error) {
 	if err != nil {
 		return templateSource{}, fmt.Errorf("read template %s: %w", file, err)
 	}
-	c.sources[templatePath] = templateSource{file: file, content: string(content)}
+	sub, err := c.subchart(templatePath)
+	if err != nil {
+		return templateSource{}, err
+	}
+	c.sources[templatePath] = templateSource{file: file, content: string(content), sub: sub}
 	return c.sources[templatePath], nil
+}
+
+// subchart loads the subchart that holds templatePath, or returns nil for the parent's own templates.
+func (c chartRenderer) subchart(templatePath string) (*subchartRender, error) {
+	chart, ok, err := chartloader.LoadSubchartFor(c.chartPath, templatePath)
+	if err != nil || !ok {
+		return nil, err
+	}
+	files, err := chartloader.LoadChartFiles(chart.Path)
+	if err != nil {
+		return nil, fmt.Errorf("subchart %s: %w", chart.Meta.Name, err)
+	}
+	templates, err := chartloader.LoadTemplateFiles(chart.Path)
+	if err != nil {
+		return nil, fmt.Errorf("subchart %s: %w", chart.Meta.Name, err)
+	}
+	// Helm parses parent and subchart templates together, so either can include the other's defines.
+	maps.Copy(templates, c.templates)
+	return &subchartRender{chart: chart, files: files, templates: templates}, nil
 }
 
 type target struct {
