@@ -65,6 +65,10 @@ inputs:
     description: Include the per-file coverage table in the PR comment.
     required: false
     default: "false"
+  compare-base:
+    description: On pull requests, also measure the base commit and show the coverage change in the comment.
+    required: false
+    default: "true"
   include-tpl-sources:
     description: Include tpl(...) inline template sources (tpl:<hash>) in markdown output.
     required: false
@@ -103,10 +107,40 @@ runs:
           "${{ inputs.repository }}" \
           "${{ runner.temp }}/helmcov-bin"
 
+    - name: Measure base coverage
+      id: base
+      if: inputs.compare-base == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      # A base that cannot render, such as one without the chart yet, only drops the comparison.
+      continue-on-error: true
+      env:
+        HELMCOV: ${{ runner.temp }}/helmcov-bin/helmcov
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        OUT_DIR: ${{ runner.temp }}/helmcov-base
+        CHART: ${{ inputs.chart }}
+        TESTS: ${{ inputs.tests }}
+        CHARTS: ${{ inputs.charts }}
+        MAX_SCENARIOS: ${{ inputs.max-scenarios }}
+        SEED: ${{ inputs.seed }}
+        KUBE_VERSION: ${{ inputs.kube-version }}
+      run: |
+        ARGS=(--max-scenarios "$MAX_SCENARIOS" --seed "$SEED" --kube-version "$KUBE_VERSION")
+        if [ -n "$CHARTS" ]; then
+          ARGS+=(--charts "$CHARTS")
+        else
+          ARGS+=(--chart "$CHART")
+          if [ -n "$TESTS" ]; then
+            ARGS+=(--tests "$TESTS")
+          fi
+        fi
+        "${{ github.action_path }}/scripts/action-base.sh" "$HELMCOV" "$BASE_SHA" "$OUT_DIR" "${ARGS[@]}"
+
     - name: Run helmcov
       id: run
       shell: bash
       continue-on-error: true
+      env:
+        BASELINE: ${{ steps.base.outputs.cobertura-file }}
       run: |
         set -euo pipefail
         HELMcov="${{ runner.temp }}/helmcov-bin/helmcov"
@@ -123,6 +157,10 @@ runs:
         # Only when set, so pinned releases older than the flag keep working.
         if [ "${{ inputs.branch-threshold }}" != "0" ] && [ -n "${{ inputs.branch-threshold }}" ]; then
           ARGS+=(--branch-threshold "${{ inputs.branch-threshold }}")
+        fi
+        # Only when the binary knows the flag, so pinned older releases keep working.
+        if [ -n "$BASELINE" ] && [[ "$("$HELMcov" --help 2>&1 || true)" == *-baseline* ]]; then
+          ARGS+=(--baseline "$BASELINE")
         fi
         if [ "${{ inputs.file-summary }}" = "true" ]; then
           ARGS+=(--markdown-file-summary)

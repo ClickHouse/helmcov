@@ -457,3 +457,43 @@ func TestRunReportsCoverageReachedByTestsAlone(t *testing.T) {
 		}
 	}
 }
+
+func TestRunComparesAgainstBaseline(t *testing.T) {
+	t.Parallel()
+
+	chart, tests := halfCoveredChart(t)
+	out := t.TempDir()
+	baseline := filepath.Join(out, "base.xml")
+	writeTestFile(t, baseline, `<?xml version="1.0" encoding="UTF-8"?>
+<coverage line-rate="0.6250" branch-rate="0.7500" version="helmcov"></coverage>
+`)
+	markdown := filepath.Join(out, "c.md")
+	var stdout bytes.Buffer
+	err := Run([]string{
+		"--chart", chart, "--tests", tests, "--max-scenarios", "1",
+		"--format", "markdown", "--markdown-file", markdown, "--baseline", baseline,
+	}, &stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	md, err := os.ReadFile(markdown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"| Line coverage | 50.00% (-12.50) |", "| Branch coverage | 50.00% (-25.00) |"} {
+		if !strings.Contains(string(md), want) {
+			t.Errorf("markdown missing %q:\n%s", want, md)
+		}
+	}
+
+	for name, content := range map[string]string{"missing": "", "not cobertura": "<coverage line-rate=\"x\"/>"} {
+		path := filepath.Join(out, strings.ReplaceAll(name, " ", "-")+".xml")
+		if content != "" {
+			writeTestFile(t, path, content)
+		}
+		err := Run([]string{"--chart", chart, "--tests", tests, "--format", "markdown", "--markdown-file", markdown, "--baseline", path}, &stdout)
+		if err == nil || !strings.Contains(err.Error(), "baseline") {
+			t.Errorf("%s baseline: err = %v, want a baseline error", name, err)
+		}
+	}
+}
